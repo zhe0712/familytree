@@ -120,7 +120,7 @@ export default function App() {
 
   useEffect(() => {
     if (!searchHighlightId) return;
-    const timer = setTimeout(() => setSearchHighlightId(null), 4000);
+    const timer = setTimeout(() => setSearchHighlightId(null), 8000);
     return () => clearTimeout(timer);
   }, [searchHighlightId]);
 
@@ -759,6 +759,8 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
   useEffect(() => {
     if (!focusId) return;
     const engine = engineRef.current;
+    // Ensure searched member is visible even if it is under a collapsed branch.
+    engine.collapsedNodes = new Set();
     const node = engine.nodes.find(n => n.id === focusId);
     const canvas = canvasRef.current;
     if (!node || !canvas) return;
@@ -1018,13 +1020,18 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
 
         if (isSearchHit && !n.isHidden) {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius + 18, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+          ctx.arc(n.x, n.y, n.radius + 22, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(245, 158, 11, 0.28)';
           ctx.fill();
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius + 15, 0, Math.PI * 2);
-          ctx.lineWidth = 3;
+          ctx.arc(n.x, n.y, n.radius + 18, 0, Math.PI * 2);
+          ctx.lineWidth = 4;
           ctx.strokeStyle = '#f59e0b';
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.radius + 10, 0, Math.PI * 2);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#fde68a';
           ctx.stroke();
         }
 
