@@ -952,6 +952,49 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       }
     });
 
+    // Eject any outsider node sitting between a spouse pair.
+    const spousePairs = [];
+    links.forEach(link => {
+      if (link.type !== 'spouse') return;
+      const a = link.source;
+      const b = link.target;
+      if (a.isHidden || b.isHidden) return;
+      spousePairs.push([a, b]);
+    });
+
+    sortedGens.forEach(gen => {
+      const row = (genMap.get(gen) || []).slice().sort((a, b) => a.targetX - b.targetX);
+      let changed = true;
+      let iterations = 0;
+      while (changed && iterations < 10) {
+        changed = false;
+        iterations++;
+        for (const [sa, sb] of spousePairs) {
+          if (sa.gen !== gen) continue;
+          const leftSpouse = sa.targetX < sb.targetX ? sa : sb;
+          const rightSpouse = sa.targetX < sb.targetX ? sb : sa;
+          const lo = leftSpouse.targetX;
+          const hi = rightSpouse.targetX;
+          for (const n of row) {
+            if (n === sa || n === sb) continue;
+            if (n.targetX > lo && n.targetX < hi) {
+              // Outsider is between the spouse pair — push to nearest side
+              const distToLeft = n.targetX - lo;
+              const distToRight = hi - n.targetX;
+              if (distToLeft <= distToRight) {
+                n.targetX = lo - 160;
+              } else {
+                n.targetX = hi + 160;
+              }
+              changed = true;
+            }
+          }
+        }
+        // Re-sort row after moves
+        row.sort((a, b) => a.targetX - b.targetX);
+      }
+    });
+
     // Hidden nodes collapse toward nearest parent to keep transitions smooth.
     nodes.forEach(n => {
       if (!n.isHidden) return;
