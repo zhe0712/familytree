@@ -161,6 +161,18 @@ const resolveAgeAwareKinship = (fromId, toId, members, path) => {
   const siblingKinship = resolveSiblingKinship(fromId, toId, members, path, to.gender);
   if (siblingKinship) return siblingKinship;
 
+  // 甥/姪優先：避免三段路徑被叔伯規則誤判。
+  // path pattern: 父/母 -> 兄弟/姊妹 -> 其子女
+  if (
+    path.length === 3
+    && (path[0] === 'F' || path[0] === 'M')
+    && (path[1] === 'S' || path[1] === 'D')
+    && (path[2] === 'S' || path[2] === 'D')
+  ) {
+    if (path[1] === 'S') return to.gender === 'M' ? '姪子' : '姪女';
+    return to.gender === 'M' ? '外甥' : '外甥女';
+  }
+
   // 伯/叔、姑媽/姑姑、大舅/小舅、姨媽/阿姨
   // Only treat as uncle/aunt when the middle step is grandparent (F/M),
   // not sibling (S/D). This avoids misclassifying 「妹妹的兒子」.
@@ -1048,6 +1060,41 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         unit.nodes[0].targetX = center;
       });
 
+      // Backward pass keeps minimum gaps while reducing one-direction drift.
+      for (let i = units.length - 2; i >= 0; i--) {
+        const curr = units[i];
+        const next = units[i + 1];
+        const maxCenter = next.center - (curr.width / 2 + next.width / 2 + unitGap);
+        if (curr.center > maxCenter) {
+          curr.center = maxCenter;
+        }
+      }
+
+      // Preserve row anchor so rows do not keep collapsing toward center.
+      const meanCenter = units.reduce((sum, u) => sum + u.center, 0) / units.length;
+      const shift = rowAnchor - meanCenter;
+      units.forEach(u => {
+        u.center += shift;
+      });
+
+      units.forEach(unit => {
+        if (unit.type === 'spouse') {
+          unit.nodes[0].targetX = unit.center - spouseGap / 2;
+          unit.nodes[1].targetX = unit.center + spouseGap / 2;
+          return;
+        }
+
+        if (unit.type === 'siblings') {
+          const left = unit.center - unit.width / 2;
+          unit.nodes.forEach((node, index) => {
+            node.targetX = left + index * siblingGap;
+          });
+          return;
+        }
+
+        unit.nodes[0].targetX = unit.center;
+      });
+
       // Intentionally avoid per-generation hard-centering.
       // If we center every row, the whole tree collapses toward the middle.
 
@@ -1066,16 +1113,16 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       });
 
       // Do not let unrelated nodes be inserted between same-parent siblings.
-      const siblingGroups = new Map();
+      const siblingGroupsAfterAlign = new Map();
       row.forEach(node => {
         const pids = (node.data.parents || []).slice().sort();
         if (pids.length === 0) return;
         const key = pids.join(',');
-        if (!siblingGroups.has(key)) siblingGroups.set(key, []);
-        siblingGroups.get(key).push(node);
+        if (!siblingGroupsAfterAlign.has(key)) siblingGroupsAfterAlign.set(key, []);
+        siblingGroupsAfterAlign.get(key).push(node);
       });
 
-      siblingGroups.forEach(group => {
+      siblingGroupsAfterAlign.forEach(group => {
         if (group.length < 2) return;
         const sortedGroup = group.slice().sort((a, b) => a.targetX - b.targetX);
         const groupIds = new Set(sortedGroup.map(n => n.id));
