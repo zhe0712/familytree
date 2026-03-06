@@ -162,7 +162,9 @@ const resolveAgeAwareKinship = (fromId, toId, members, path) => {
   if (siblingKinship) return siblingKinship;
 
   // 伯/叔、姑媽/姑姑、大舅/小舅、姨媽/阿姨
-  if (path.length === 3 && (path[2] === 'S' || path[2] === 'D') && (path[0] === 'F' || path[0] === 'M')) {
+  // path[1] must be 'F' or 'M' (going up to grandparent) to distinguish from
+  // nephew/niece paths like F,D,S (外甥) or F,S,S (姪子) where path[1] is 'S'/'D'.
+  if (path.length === 3 && (path[2] === 'S' || path[2] === 'D') && (path[0] === 'F' || path[0] === 'M') && (path[1] === 'F' || path[1] === 'M')) {
     const referenceParent = (from.parents || []).find(pid => members[pid] && (path[0] === 'F' ? members[pid].gender === 'M' : members[pid].gender === 'F'));
     const isOlderThanParent = referenceParent ? compareBirthdayOrder(to.birthday, members[referenceParent].birthday) : null;
 
@@ -919,25 +921,34 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         });
     });
 
-    // Final overlap resolver per generation.
+    // Final overlap resolver per generation — symmetric push to avoid drift.
     sortedGens.forEach(gen => {
       const row = (genMap.get(gen) || []).slice().sort((a, b) => a.targetX - b.targetX);
+      // Forward pass: push right when too close.
       for (let i = 1; i < row.length; i++) {
         const prev = row[i - 1];
         const curr = row[i];
-        const related = prev.data.spouses.includes(curr.id) || curr.data.spouses.includes(prev.id);
-        const minGap = related ? 125 : 150;
+        const isSpousePair = prev.data.spouses.includes(curr.id) || curr.data.spouses.includes(prev.id);
+        const minGap = isSpousePair ? 125 : 160;
         const gap = curr.targetX - prev.targetX;
         if (gap < minGap) {
-          curr.targetX = prev.targetX + minGap;
+          const fix = (minGap - gap) / 2;
+          prev.targetX -= fix;
+          curr.targetX += fix;
         }
       }
-
-      if (row.length > 0) {
-        const centerShift = (row[0].targetX + row[row.length - 1].targetX) / 2;
-        row.forEach(n => {
-          n.targetX -= centerShift;
-        });
+      // Backward pass: propagate leftward adjustments.
+      for (let i = row.length - 2; i >= 0; i--) {
+        const curr = row[i];
+        const next = row[i + 1];
+        const isSpousePair = curr.data.spouses.includes(next.id) || next.data.spouses.includes(curr.id);
+        const minGap = isSpousePair ? 125 : 160;
+        const gap = next.targetX - curr.targetX;
+        if (gap < minGap) {
+          const fix = (minGap - gap) / 2;
+          curr.targetX -= fix;
+          next.targetX += fix;
+        }
       }
     });
 
@@ -1141,6 +1152,19 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         n.vy = n.vy * 0.72 + (n.targetY - n.y) * 0.16;
         n.x += n.vx;
         n.y += n.vy;
+
+        // Snap to target when nearly settled to stop micro-oscillation.
+        if (
+          Math.abs(n.targetX - n.x) < 0.8
+          && Math.abs(n.targetY - n.y) < 0.8
+          && Math.abs(n.vx) < 0.4
+          && Math.abs(n.vy) < 0.4
+        ) {
+          n.x = n.targetX;
+          n.y = n.targetY;
+          n.vx = 0;
+          n.vy = 0;
+        }
       });
 
       // Visible node collision pass.
@@ -1150,27 +1174,38 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
           for (let j = i + 1; j < visibleNodes.length; j++) {
             const a = visibleNodes[i];
             const b = visibleNodes[j];
-            let dx = b.x - a.x;
-            let dy = b.y - a.y;
-            if (dx === 0 && dy === 0) {
-              dx = 1;
-              dy = 0;
-            }
-            const dist = Math.hypot(dx, dy);
             const isSpouse = a.data.spouses.includes(b.id);
-            const isSibling = a.data.parents.some(pid => b.data.parents.includes(pid));
-            const isParentChild = a.data.parents.includes(b.id) || b.data.parents.includes(a.id);
-            const sameGenUnrelated = a.gen === b.gen && !isSpouse && !isSibling && !isParentChild;
-            const minDist = isSpouse ? 118 : (sameGenUnrelated ? 168 : 136);
+            const sameGen = a.gen === b.gen;
 
-            if (dist < minDist) {
-              const overlap = minDist - dist;
-              const nx = dx / dist;
-              const ny = dy / dist;
-              a.x -= nx * overlap * 0.5;
-              a.y -= ny * overlap * 0.3;
-              b.x += nx * overlap * 0.5;
-              b.y += ny * overlap * 0.3;
+            if (sameGen) {
+              // Same generation: push horizontally only — keep rows stable.
+              let dx = b.x - a.x;
+              if (dx === 0) dx = 1;
+              const absDx = Math.abs(dx);
+              // Use minDist <= layout minGap (160) to avoid spring-collision fight.
+              const minDist = isSpouse ? 115 : 150;
+              if (absDx < minDist) {
+                const fix = (minDist - absDx) * 0.35;
+                const sign = dx > 0 ? 1 : -1;
+                a.x -= sign * fix;
+                b.x += sign * fix;
+              }
+            } else {
+              // Cross-generation: use radial push (rare with good layout).
+              let dx = b.x - a.x;
+              let dy = b.y - a.y;
+              if (dx === 0 && dy === 0) { dx = 1; dy = 0; }
+              const dist = Math.hypot(dx, dy);
+              const minDist = 120;
+              if (dist < minDist) {
+                const overlap = minDist - dist;
+                const nx = dx / dist;
+                const ny = dy / dist;
+                a.x -= nx * overlap * 0.3;
+                a.y -= ny * overlap * 0.15;
+                b.x += nx * overlap * 0.3;
+                b.y += ny * overlap * 0.15;
+              }
             }
           }
         }
