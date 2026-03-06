@@ -36,6 +36,33 @@ const INITIAL_MEMBERS = {
 };
 
 const LOCAL_STORAGE_KEY = 'familytree.autosave.v1';
+const SHARE_HASH_KEY = '#share=';
+const MAX_SHARE_URL_LENGTH = 6000;
+
+const encodeSharePayload = (payload) => {
+  const json = JSON.stringify(payload);
+  const bytes = new TextEncoder().encode(json);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+};
+
+const decodeSharePayload = (token) => {
+  try {
+    const normalized = token.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '==='.slice((normalized.length + 3) % 4);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const parsed = JSON.parse(new TextDecoder().decode(bytes));
+    if (!parsed?.treeName || !parsed?.members || !parsed?.meId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
 
 const readSavedTree = () => {
   try {
@@ -148,6 +175,20 @@ export default function App() {
     if (!saved) return;
     savedTreeRef.current = saved;
     setHasSavedLocalData(true);
+  }, []);
+
+  useEffect(() => {
+    if (!window.location.hash.startsWith(SHARE_HASH_KEY)) return;
+    const token = window.location.hash.slice(SHARE_HASH_KEY.length);
+    const shared = decodeSharePayload(token);
+    if (!shared) return;
+
+    setTreeName(shared.treeName);
+    setMembers(shared.members);
+    setMeId(shared.meId);
+    setSelectedId(null);
+    setSuppressProfilePanel(false);
+    setIsStartOpen(false);
   }, []);
 
   useEffect(() => {
@@ -265,6 +306,37 @@ export default function App() {
     setHasSavedLocalData(false);
   };
 
+  const handleShareLink = async () => {
+    const payload = { treeName, members, meId };
+    const token = encodeSharePayload(payload);
+    const shareUrl = `${window.location.origin}${window.location.pathname}${SHARE_HASH_KEY}${token}`;
+
+    if (shareUrl.length > MAX_SHARE_URL_LENGTH) {
+      alert('資料量較大，分享連結會過長。請改用「儲存」匯出 JSON 檔案後再分享。');
+      return;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: treeName,
+          text: '這是我分享的家族族譜',
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // User cancelled; fall back to clipboard.
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      alert('已複製分享連結');
+    } catch {
+      prompt('請複製此分享連結', shareUrl);
+    }
+  };
+
   // 匯出 JSON (包含族譜名稱與成員資料)
   const handleExportJSON = () => {
     const exportData = { treeName, members };
@@ -378,6 +450,9 @@ export default function App() {
             <div className="flex flex-wrap items-center gap-1 md:gap-2 text-[11px] md:text-sm text-gray-500 mt-0.5 md:mt-0">
               <button onClick={handleExportJSON} className="hover:text-emerald-600 flex items-center gap-1 transition p-1 bg-gray-50/50 rounded">
                 <Download size={14}/> <span className="hidden sm:inline">儲存</span>
+              </button>
+              <button onClick={handleShareLink} className="hover:text-emerald-600 flex items-center gap-1 transition p-1 bg-gray-50/50 rounded">
+                <Share2 size={14}/> <span className="hidden sm:inline">分享</span>
               </button>
               <label className="hover:text-emerald-600 flex items-center gap-1 cursor-pointer transition p-1 bg-gray-50/50 rounded">
                 <Upload size={14}/> <span className="hidden sm:inline">載入</span>
