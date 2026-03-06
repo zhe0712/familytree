@@ -98,6 +98,7 @@ export default function App() {
   const [isStartOpen, setIsStartOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [searchFocusId, setSearchFocusId] = useState(null);
   const [searchHighlightId, setSearchHighlightId] = useState(null);
   
@@ -185,6 +186,7 @@ export default function App() {
     setSearchHighlightId(id);
     setSearchQuery(members[id].name);
     setIsSearchOpen(false);
+    setIsMobileSearchOpen(false);
   };
 
   // 匯出 JSON (包含族譜名稱與成員資料)
@@ -234,6 +236,11 @@ export default function App() {
           meId={meId}
           focusId={searchFocusId}
           searchHighlightId={searchHighlightId}
+          onQuickAdd={() => {
+            setQaContext({ relativeId: selectedId || meId, relationType: 'child' });
+            setIsQAOpen(true);
+          }}
+          onOpenMobileSearch={() => setIsMobileSearchOpen(true)}
         />
         
         {/* 手機版與桌面版相容的頂部控制列 */}
@@ -333,7 +340,7 @@ export default function App() {
         {/* 快速新增按鈕：手機版改為右下角懸浮 (Floating Action Button) */}
         <button 
           onClick={() => { setQaContext({ relativeId: selectedId || meId, relationType: 'child' }); setIsQAOpen(true); }}
-          className={`absolute bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] right-4 md:left-auto md:bottom-4 md:top-auto ${selectedMember ? 'md:right-[25rem]' : 'md:right-4'} bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl md:shadow-lg rounded-full md:rounded-2xl p-4 md:px-5 md:py-3 flex items-center gap-2 pointer-events-auto transition-transform hover:scale-105 z-40`}
+          className={`hidden md:flex absolute md:left-auto md:bottom-4 md:top-auto ${selectedMember ? 'md:right-[25rem]' : 'md:right-4'} bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl md:shadow-lg rounded-full md:rounded-2xl p-4 md:px-5 md:py-3 items-center gap-2 pointer-events-auto transition-transform hover:scale-105 z-40`}
         >
           <UserPlus size={24} className="md:w-5 md:h-5" />
           <span className="font-semibold hidden md:inline">快速新增</span>
@@ -418,6 +425,67 @@ export default function App() {
           }}
         />
       )}
+
+      {isMobileSearchOpen && (
+        <div className="fixed inset-0 z-[90] bg-white/95 backdrop-blur-sm p-4 md:hidden">
+          <div className="max-w-lg mx-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-gray-800">搜尋人物</h3>
+              <button
+                onClick={() => setIsMobileSearchOpen(false)}
+                className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+              <Search size={16} className="text-gray-400" />
+              <input
+                autoFocus
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="輸入姓名或 ID"
+                className="w-full bg-transparent outline-none text-sm text-gray-700"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="mt-3 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              {searchQuery.trim() ? (
+                searchResults.length === 0 ? (
+                  <div className="px-3 py-3 text-sm text-gray-400">找不到符合的人物</div>
+                ) : (
+                  searchResults.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => handleSelectFromSearch(m.id)}
+                      className="w-full text-left px-3 py-3 hover:bg-emerald-50 flex items-center justify-between border-b border-gray-50 last:border-b-0"
+                    >
+                      <span className="text-sm font-medium text-gray-700">{m.name}</span>
+                      <span className="text-xs text-gray-400">{m.id}</span>
+                    </button>
+                  ))
+                )
+              ) : (
+                <div className="px-3 py-3 text-sm text-gray-400">輸入關鍵字開始搜尋</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] md:text-xs text-gray-500/80 pointer-events-none z-10 whitespace-nowrap">
+        Copyright © 禾軒有限公司 2026
+      </div>
     </div>
   );
 }
@@ -425,7 +493,7 @@ export default function App() {
 // ==========================================
 // 4. Canvas 互動族譜樹核心組件 (重寫版平滑物理引擎)
 // ==========================================
-const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighlightId }) => {
+const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighlightId, onQuickAdd, onOpenMobileSearch }) => {
   const canvasRef = useRef(null);
   const dprRef = useRef(typeof window !== 'undefined' ? Math.max(1, window.devicePixelRatio || 1) : 1);
   const suppressMouseUntilRef = useRef(0);
@@ -1165,6 +1233,20 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
       />
       
         <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] left-4 md:bottom-6 md:left-6 flex flex-col gap-2 pointer-events-auto z-30">
+           <button
+             onClick={onQuickAdd}
+             className="md:hidden p-3 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700"
+             aria-label="快速新增"
+           >
+             <UserPlus size={20}/>
+           </button>
+           <button
+             onClick={onOpenMobileSearch}
+             className="md:hidden p-3 bg-white rounded-full shadow-lg hover:bg-gray-50"
+             aria-label="搜尋"
+           >
+             <Search size={20}/>
+           </button>
          <button onClick={() => engineRef.current.transform.scale *= 1.2} className="p-3 md:p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"><ZoomIn size={20}/></button>
          <button onClick={() => engineRef.current.transform.scale *= 0.8} className="p-3 md:p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"><ZoomOut size={20}/></button>
          <button onClick={() => {
