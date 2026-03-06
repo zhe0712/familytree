@@ -399,6 +399,7 @@ export default function App() {
   const [isResetOpen, setIsResetOpen] = useState(false); 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showInLaws, setShowInLaws] = useState(true);
+  const [autoSelectNew, setAutoSelectNew] = useState(false);
   const fileInputRef = useRef(null);
   const savedTreeRef = useRef(null);
 
@@ -458,7 +459,7 @@ export default function App() {
 
   const handleUpdateMembers = (newMembersMap, targetId) => {
     setMembers(normalizeMembers(newMembersMap));
-    setSelectedId(targetId);
+    if (autoSelectNew) setSelectedId(targetId);
     setIsQAOpen(false);
   };
 
@@ -818,6 +819,15 @@ export default function App() {
               });
               setIsQAOpen(true);
             }}
+            onAddByText={(relText) => {
+              setQaContext({
+                relativeId: selectedId,
+                relationType: 'child',
+                preferredTab: 'text',
+                prefillRelText: relText,
+              });
+              setIsQAOpen(true);
+            }}
             onShowQR={() => setIsQROpen(true)}
             onAddPost={handleAddPost}
             onUpdateMember={handleUpdateMember}
@@ -864,6 +874,18 @@ export default function App() {
                   className={`relative w-11 h-6 rounded-full transition-colors ${showInLaws ? 'bg-emerald-500' : 'bg-gray-300'}`}
                 >
                   <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showInLaws ? 'translate-x-5' : ''}`}/>
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-700">新增後自動選取新成員</span>
+                <button 
+                  type="button"
+                  role="switch"
+                  aria-checked={autoSelectNew}
+                  onClick={() => setAutoSelectNew(v => !v)}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${autoSelectNew ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                >
+                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${autoSelectNew ? 'translate-x-5' : ''}`}/>
                 </button>
               </div>
             </div>
@@ -2075,10 +2097,11 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
 // ==========================================
 // 5. 側邊欄 - 個人資料面板
 // ==========================================
-const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRelative, onShowQR, onAddPost, onUpdateMember, onDeleteMember }) => {
+const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRelative, onAddByText, onShowQR, onAddPost, onUpdateMember, onDeleteMember }) => {
   const [postText, setPostText] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(member.name);
+  const [quickRelText, setQuickRelText] = useState('');
 
   useEffect(() => {
     setEditName(member.name);
@@ -2163,6 +2186,28 @@ const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRel
             <button onClick={() => onAddRelative('spouse')} className="py-2 border border-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm font-medium">配偶</button>
             <button onClick={() => onAddRelative('child')} className="py-2 border border-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm font-medium">子女</button>
             <button onClick={() => onAddRelative('sibling')} className="py-2 border border-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm font-medium">兄弟姊妹</button>
+          </div>
+          <div className="mt-3">
+            <label className="block text-xs text-gray-400 mb-1">或輸入關係描述快速建立</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="例：姑姑的小孩、小姨子"
+                value={quickRelText}
+                onChange={e => setQuickRelText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && quickRelText.trim()) {
+                    onAddByText(quickRelText.trim());
+                    setQuickRelText('');
+                  }
+                }}
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                onClick={() => { if (quickRelText.trim()) { onAddByText(quickRelText.trim()); setQuickRelText(''); } }}
+                className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition shrink-0"
+              >建立</button>
+            </div>
           </div>
           <div className="flex gap-2 mt-3">
             <button
@@ -2333,7 +2378,7 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
   const [textData, setTextData] = useState({
     name: '', gender: 'M', birthday: '', deathDate: '',
     relativeId: context?.relativeId || Object.keys(members)[0],
-    relationText: ''
+    relationText: context?.prefillRelText || ''
   });
 
   const [showDeathDateForm, setShowDeathDateForm] = useState(false);
