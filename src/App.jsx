@@ -225,7 +225,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#F5F5F0] overflow-hidden font-sans text-gray-800 relative">
+    <div className="flex h-[100dvh] w-full bg-[#F5F5F0] overflow-hidden font-sans text-gray-800 relative">
       <div className="relative flex-1 h-full">
         <CanvasTree 
           members={members} 
@@ -333,7 +333,7 @@ export default function App() {
         {/* 快速新增按鈕：手機版改為右下角懸浮 (Floating Action Button) */}
         <button 
           onClick={() => { setQaContext({ relativeId: selectedId || meId, relationType: 'child' }); setIsQAOpen(true); }}
-          className={`absolute bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 md:left-auto md:bottom-4 md:top-auto ${selectedMember ? 'md:right-[25rem]' : 'md:right-4'} bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl md:shadow-lg rounded-full md:rounded-2xl p-4 md:px-5 md:py-3 flex items-center gap-2 pointer-events-auto transition-transform hover:scale-105 z-40`}
+          className={`absolute bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] right-4 md:left-auto md:bottom-4 md:top-auto ${selectedMember ? 'md:right-[25rem]' : 'md:right-4'} bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl md:shadow-lg rounded-full md:rounded-2xl p-4 md:px-5 md:py-3 flex items-center gap-2 pointer-events-auto transition-transform hover:scale-105 z-40`}
         >
           <UserPlus size={24} className="md:w-5 md:h-5" />
           <span className="font-semibold hidden md:inline">快速新增</span>
@@ -428,6 +428,7 @@ export default function App() {
 const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighlightId }) => {
   const canvasRef = useRef(null);
   const dprRef = useRef(typeof window !== 'undefined' ? Math.max(1, window.devicePixelRatio || 1) : 1);
+  const suppressMouseUntilRef = useRef(0);
   
   const engineRef = useRef({
     nodes: [],
@@ -1014,6 +1015,8 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
   }, [selectedId, members]);
 
   const handleMouseDown = (e) => {
+    if (Date.now() < suppressMouseUntilRef.current) return;
+
     // 支援 MouseEvent 或 Touch 傳遞來的物件
     const clientX = e.clientX;
     const clientY = e.clientY;
@@ -1101,6 +1104,9 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
 
   // --- 新增：行動裝置觸控事件 (Touch Events) ---
   const handleTouchStart = (e) => {
+    suppressMouseUntilRef.current = Date.now() + 700;
+    e.preventDefault();
+
     if (e.touches.length === 1) {
       handleMouseDown({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
     } else if (e.touches.length === 2) {
@@ -1114,6 +1120,8 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
   };
 
   const handleTouchMove = (e) => {
+    suppressMouseUntilRef.current = Date.now() + 700;
+
     if (e.touches.length === 1 && engineRef.current.isDragging) {
       handleMouseMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
     } else if (e.touches.length === 2 && engineRef.current.pinchStartDist) {
@@ -1129,6 +1137,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
   };
 
   const handleTouchEnd = () => {
+    suppressMouseUntilRef.current = Date.now() + 700;
     handleMouseUp();
     engineRef.current.pinchStartDist = null;
   };
@@ -1151,7 +1160,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
         className="w-full h-full block"
       />
       
-        <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-4 md:bottom-6 md:left-6 flex flex-col gap-2 pointer-events-auto z-30">
+        <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] left-4 md:bottom-6 md:left-6 flex flex-col gap-2 pointer-events-auto z-30">
          <button onClick={() => engineRef.current.transform.scale *= 1.2} className="p-3 md:p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"><ZoomIn size={20}/></button>
          <button onClick={() => engineRef.current.transform.scale *= 0.8} className="p-3 md:p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"><ZoomOut size={20}/></button>
          <button onClick={() => {
