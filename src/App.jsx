@@ -161,27 +161,8 @@ const resolveAgeAwareKinship = (fromId, toId, members, path) => {
   const siblingKinship = resolveSiblingKinship(fromId, toId, members, path, to.gender);
   if (siblingKinship) return siblingKinship;
 
-  // 甥/姪優先：避免三段路徑被叔伯規則誤判。
-  // path pattern: 父/母 -> 兄弟/姊妹 -> 其子女
-  if (
-    path.length === 3
-    && (path[0] === 'F' || path[0] === 'M')
-    && (path[1] === 'S' || path[1] === 'D')
-    && (path[2] === 'S' || path[2] === 'D')
-  ) {
-    if (path[1] === 'S') return to.gender === 'M' ? '姪子' : '姪女';
-    return to.gender === 'M' ? '外甥' : '外甥女';
-  }
-
   // 伯/叔、姑媽/姑姑、大舅/小舅、姨媽/阿姨
-  // Only treat as uncle/aunt when the middle step is grandparent (F/M),
-  // not sibling (S/D). This avoids misclassifying 「妹妹的兒子」.
-  if (
-    path.length === 3
-    && (path[2] === 'S' || path[2] === 'D')
-    && (path[0] === 'F' || path[0] === 'M')
-    && (path[1] === 'F' || path[1] === 'M')
-  ) {
+  if (path.length === 3 && (path[2] === 'S' || path[2] === 'D') && (path[0] === 'F' || path[0] === 'M')) {
     const referenceParent = (from.parents || []).find(pid => members[pid] && (path[0] === 'F' ? members[pid].gender === 'M' : members[pid].gender === 'F'));
     const isOlderThanParent = referenceParent ? compareBirthdayOrder(to.birthday, members[referenceParent].birthday) : null;
 
@@ -889,12 +870,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
 
     sortedGens.forEach(gen => {
       const row = genMap.get(gen);
-      const rowIdSet = new Set(row.map(n => n.id));
       row.sort((a, b) => {
-        const aHasSpouseInRow = a.data.spouses.some(sid => rowIdSet.has(sid));
-        const bHasSpouseInRow = b.data.spouses.some(sid => rowIdSet.has(sid));
-        if (aHasSpouseInRow !== bHasSpouseInRow) return aHasSpouseInRow ? -1 : 1;
-
         const aFamily = a.data.parents.length ? [...a.data.parents].sort().join(',') : a.id;
         const bFamily = b.data.parents.length ? [...b.data.parents].sort().join(',') : b.id;
         if (aFamily !== bFamily) return aFamily.localeCompare(bFamily);
@@ -904,16 +880,10 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         return a.id.localeCompare(b.id);
       });
 
-      // Use current row centroid as anchor instead of hard-centering every row at 0.
-      // This keeps branch positions spreading to both sides like a tree.
-      const rowAnchor = row.length > 0
-        ? row.reduce((sum, n) => sum + (typeof n.targetX === 'number' ? n.targetX : n.x), 0) / row.length
-        : 0;
-      let cursor = rowAnchor - ((row.length - 1) * colSpacing) / 2;
+      let cursor = -((row.length - 1) * colSpacing) / 2;
       row.forEach(n => {
-        if (typeof n.targetX !== 'number') {
-          n.targetX = cursor;
-        }
+        if (typeof n.targetX !== 'number') n.targetX = n.x;
+        n.targetX = cursor;
         n.targetY = n.gen * rowSpacing;
         cursor += colSpacing;
       });
@@ -949,229 +919,25 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         });
     });
 
-    // Deterministic row packing: spouse priority, then same-parent siblings, then singles.
+    // Final overlap resolver per generation.
     sortedGens.forEach(gen => {
-      const row = (genMap.get(gen) || []).filter(n => !n.isHidden);
-      if (row.length === 0) return;
-      const rowAnchor = row.reduce((sum, n) => sum + n.targetX, 0) / row.length;
-
-      const rowSet = new Set(row.map(n => n.id));
-      const rowById = new Map(row.map(n => [n.id, n]));
-      const assigned = new Set();
-      const units = [];
-      const siblingGap = 145;
-      const unitGap = 170;
-
-      // Priority 1: spouse pairs stay adjacent.
-      const seenPairs = new Set();
-      links.forEach(link => {
-        if (link.type !== 'spouse') return;
-        const a = link.source;
-        const b = link.target;
-        if (a.gen !== gen || b.gen !== gen) return;
-        if (a.isHidden || b.isHidden) return;
-        if (!rowSet.has(a.id) || !rowSet.has(b.id)) return;
-        const pairKey = [a.id, b.id].sort().join('|');
-        if (seenPairs.has(pairKey)) return;
-        seenPairs.add(pairKey);
-        if (assigned.has(a.id) || assigned.has(b.id)) return;
-
-        const nodesInUnit = [a, b].sort((n1, n2) => n1.targetX - n2.targetX);
-        units.push({
-          type: 'spouse',
-          priority: 0,
-          key: pairKey,
-          nodes: nodesInUnit,
-          width: spouseGap,
-          anchor: (a.targetX + b.targetX) / 2,
-        });
-        assigned.add(a.id);
-        assigned.add(b.id);
-      });
-
-      // Priority 2: same-parent sibling groups remain contiguous.
-      const siblingGroups = new Map();
-      row.forEach(node => {
-        if (assigned.has(node.id)) return;
-        const pids = (node.data.parents || []).slice().sort();
-        if (pids.length === 0) return;
-        const key = pids.join(',');
-        if (!siblingGroups.has(key)) siblingGroups.set(key, []);
-        siblingGroups.get(key).push(node);
-      });
-
-      siblingGroups.forEach((group, key) => {
-        if (group.length < 2) return;
-        group.sort((a, b) => a.targetX - b.targetX);
-        units.push({
-          type: 'siblings',
-          priority: 1,
-          key,
-          nodes: group,
-          width: (group.length - 1) * siblingGap,
-          anchor: group.reduce((sum, n) => sum + n.targetX, 0) / group.length,
-        });
-        group.forEach(n => assigned.add(n.id));
-      });
-
-      // Priority 3: remaining singles.
-      row
-        .filter(n => !assigned.has(n.id))
-        .sort((a, b) => a.targetX - b.targetX)
-        .forEach(n => {
-          units.push({
-            type: 'single',
-            priority: 2,
-            key: n.id,
-            nodes: [n],
-            width: 0,
-            anchor: n.targetX,
-          });
-          assigned.add(n.id);
-        });
-
-      units.sort((a, b) => {
-        const dx = a.anchor - b.anchor;
-        if (Math.abs(dx) > 1e-6) return dx;
-        if (a.priority !== b.priority) return a.priority - b.priority;
-        return a.key.localeCompare(b.key);
-      });
-
-      let cursor = null;
-      units.forEach(unit => {
-        const minCenter = cursor === null ? unit.anchor : cursor + unit.width / 2;
-        const center = Math.max(unit.anchor, minCenter);
-        unit.center = center;
-        cursor = center + unit.width / 2 + unitGap;
-
-        if (unit.type === 'spouse') {
-          unit.nodes[0].targetX = center - spouseGap / 2;
-          unit.nodes[1].targetX = center + spouseGap / 2;
-          return;
-        }
-
-        if (unit.type === 'siblings') {
-          const left = center - unit.width / 2;
-          unit.nodes.forEach((node, index) => {
-            node.targetX = left + index * siblingGap;
-          });
-          return;
-        }
-
-        unit.nodes[0].targetX = center;
-      });
-
-      // Backward pass keeps minimum gaps while reducing one-direction drift.
-      for (let i = units.length - 2; i >= 0; i--) {
-        const curr = units[i];
-        const next = units[i + 1];
-        const maxCenter = next.center - (curr.width / 2 + next.width / 2 + unitGap);
-        if (curr.center > maxCenter) {
-          curr.center = maxCenter;
+      const row = (genMap.get(gen) || []).slice().sort((a, b) => a.targetX - b.targetX);
+      for (let i = 1; i < row.length; i++) {
+        const prev = row[i - 1];
+        const curr = row[i];
+        const related = prev.data.spouses.includes(curr.id) || curr.data.spouses.includes(prev.id);
+        const minGap = related ? 125 : 150;
+        const gap = curr.targetX - prev.targetX;
+        if (gap < minGap) {
+          curr.targetX = prev.targetX + minGap;
         }
       }
 
-      // Preserve row anchor so rows do not keep collapsing toward center.
-      const meanCenter = units.reduce((sum, u) => sum + u.center, 0) / units.length;
-      const shift = rowAnchor - meanCenter;
-      units.forEach(u => {
-        u.center += shift;
-      });
-
-      units.forEach(unit => {
-        if (unit.type === 'spouse') {
-          unit.nodes[0].targetX = unit.center - spouseGap / 2;
-          unit.nodes[1].targetX = unit.center + spouseGap / 2;
-          return;
-        }
-
-        if (unit.type === 'siblings') {
-          const left = unit.center - unit.width / 2;
-          unit.nodes.forEach((node, index) => {
-            node.targetX = left + index * siblingGap;
-          });
-          return;
-        }
-
-        unit.nodes[0].targetX = unit.center;
-      });
-
-      // Intentionally avoid per-generation hard-centering.
-      // If we center every row, the whole tree collapses toward the middle.
-
-      // Keep parent-child vertical links cleaner after packing.
-      families.forEach(fam => {
-        const children = fam.childIds.map(id => rowById.get(id)).filter(Boolean);
-        if (children.length === 0) return;
-        const parentNodes = fam.parentIds.map(id => rowById.get(id)).filter(Boolean);
-        if (parentNodes.length === 0) return;
-        const parentCenter = parentNodes.reduce((sum, p) => sum + p.targetX, 0) / parentNodes.length;
-        const sortedChildren = children.slice().sort((a, b) => a.targetX - b.targetX);
-        const left = parentCenter - ((sortedChildren.length - 1) * siblingGap) / 2;
-        sortedChildren.forEach((child, index) => {
-          child.targetX = left + index * siblingGap;
+      if (row.length > 0) {
+        const centerShift = (row[0].targetX + row[row.length - 1].targetX) / 2;
+        row.forEach(n => {
+          n.targetX -= centerShift;
         });
-      });
-
-      // Do not let unrelated nodes be inserted between same-parent siblings.
-      const siblingGroupsAfterAlign = new Map();
-      row.forEach(node => {
-        const pids = (node.data.parents || []).slice().sort();
-        if (pids.length === 0) return;
-        const key = pids.join(',');
-        if (!siblingGroupsAfterAlign.has(key)) siblingGroupsAfterAlign.set(key, []);
-        siblingGroupsAfterAlign.get(key).push(node);
-      });
-
-      siblingGroupsAfterAlign.forEach(group => {
-        if (group.length < 2) return;
-        const sortedGroup = group.slice().sort((a, b) => a.targetX - b.targetX);
-        const groupIds = new Set(sortedGroup.map(n => n.id));
-        const minX = sortedGroup[0].targetX - 36;
-        const maxX = sortedGroup[sortedGroup.length - 1].targetX + 36;
-        const centerX = (minX + maxX) / 2;
-
-        const outsidersInside = row
-          .filter(n => !groupIds.has(n.id) && n.targetX > minX && n.targetX < maxX)
-          .sort((a, b) => a.targetX - b.targetX);
-
-        const leftSide = outsidersInside.filter(n => n.targetX < centerX).sort((a, b) => b.targetX - a.targetX);
-        const rightSide = outsidersInside.filter(n => n.targetX >= centerX).sort((a, b) => a.targetX - b.targetX);
-
-        leftSide.forEach((node, index) => {
-          node.targetX = minX - 40 - index * 120;
-        });
-        rightSide.forEach((node, index) => {
-          node.targetX = maxX + 40 + index * 120;
-        });
-      });
-
-      // Final sweep: guarantee minimum horizontal spacing between all nodes in this row.
-      // This prevents the layout itself from placing targets that the collision system
-      // would then fight against the springs to resolve — the root cause of jitter.
-      const minNodeDist = 150;
-      const sorted = row.slice().sort((a, b) => a.targetX - b.targetX);
-      for (let i = 1; i < sorted.length; i++) {
-        const prev = sorted[i - 1];
-        const curr = sorted[i];
-        // Spouses are allowed to be closer.
-        if (prev.data.spouses.includes(curr.id)) continue;
-        const gap = curr.targetX - prev.targetX;
-        if (gap < minNodeDist) {
-          const fix = (minNodeDist - gap) / 2;
-          curr.targetX += fix;
-          prev.targetX -= fix;
-          // Propagate leftward to maintain spacing with earlier nodes.
-          for (let k = i - 1; k >= 1; k--) {
-            const a = sorted[k - 1];
-            const b = sorted[k];
-            if (a.data.spouses.includes(b.id)) continue;
-            const g = b.targetX - a.targetX;
-            if (g < minNodeDist) {
-              a.targetX = b.targetX - minNodeDist;
-            } else break;
-          }
-        }
       }
     });
 
@@ -1371,28 +1137,15 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
           return;
         }
 
-        n.vx = n.vx * 0.78 + (n.targetX - n.x) * 0.13;
-        n.vy = n.vy * 0.78 + (n.targetY - n.y) * 0.13;
+        n.vx = n.vx * 0.72 + (n.targetX - n.x) * 0.16;
+        n.vy = n.vy * 0.72 + (n.targetY - n.y) * 0.16;
         n.x += n.vx;
         n.y += n.vy;
-
-        // Snap to target when almost settled to prevent micro-jitter.
-        if (
-          Math.abs(n.targetX - n.x) < 0.35
-          && Math.abs(n.targetY - n.y) < 0.35
-          && Math.abs(n.vx) < 0.2
-          && Math.abs(n.vy) < 0.2
-        ) {
-          n.x = n.targetX;
-          n.y = n.targetY;
-          n.vx = 0;
-          n.vy = 0;
-        }
       });
 
       // Visible node collision pass.
       const visibleNodes = nodes.filter(n => !n.isHidden);
-      for (let pass = 0; pass < 1; pass++) {
+      for (let pass = 0; pass < 2; pass++) {
         for (let i = 0; i < visibleNodes.length; i++) {
           for (let j = i + 1; j < visibleNodes.length; j++) {
             const a = visibleNodes[i];
@@ -1407,30 +1160,21 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
             const isSpouse = a.data.spouses.includes(b.id);
             const isSibling = a.data.parents.some(pid => b.data.parents.includes(pid));
             const isParentChild = a.data.parents.includes(b.id) || b.data.parents.includes(a.id);
-            if (isSpouse) continue;
             const sameGenUnrelated = a.gen === b.gen && !isSpouse && !isSibling && !isParentChild;
-            const minDist = sameGenUnrelated ? 150 : 132;
+            const minDist = isSpouse ? 118 : (sameGenUnrelated ? 168 : 136);
 
             if (dist < minDist) {
               const overlap = minDist - dist;
               const nx = dx / dist;
               const ny = dy / dist;
-              a.x -= nx * overlap * 0.28;
-              a.y -= ny * overlap * 0.18;
-              b.x += nx * overlap * 0.28;
-              b.y += ny * overlap * 0.18;
+              a.x -= nx * overlap * 0.5;
+              a.y -= ny * overlap * 0.3;
+              b.x += nx * overlap * 0.5;
+              b.y += ny * overlap * 0.3;
             }
           }
         }
       }
-
-      // Pull nodes back toward layout targets after collision to prevent persistent tug-of-war.
-      visibleNodes.forEach(n => {
-        n.x += (n.targetX - n.x) * 0.18;
-        n.y += (n.targetY - n.y) * 0.18;
-        n.vx *= 0.9;
-        n.vy *= 0.9;
-      });
 
       const dpr = dprRef.current;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
