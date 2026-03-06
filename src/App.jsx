@@ -13,26 +13,26 @@ import {
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const INITIAL_MEMBERS = {
-  'g1_m1': { id: 'g1_m1', name: '王天明', gender: 'M', parents: [], children: ['m1', 'g2_m2'], spouses: ['g1_f1'], bio: '家族開創者，當年白手起家。', posts: [], claimed: false },
-  'g1_f1': { id: 'g1_f1', name: '李玉蘭', gender: 'F', parents: [], children: ['m1', 'g2_m2'], spouses: ['g1_m1'], bio: '溫柔堅毅，持家有道。', posts: [], claimed: false },
-  'm1': { id: 'm1', name: '王大川', gender: 'M', parents: ['g1_m1', 'g1_f1'], children: ['m3', 'm4'], spouses: ['m2'], bio: '家族大家長，熱愛書法與園藝。', posts: [{ id: 'p1', date: '2025-10-10', text: '今天在後院種下了一棵櫻花樹，希望子孫滿堂。' }], claimed: true },
-  'm2': { id: 'm2', name: '林美麗', gender: 'F', parents: [], children: ['m3', 'm4'], spouses: ['m1'], bio: '慈祥的祖母，拿手好菜是紅燒肉。', posts: [], claimed: false },
-  'g2_m2': { id: 'g2_m2', name: '王二川', gender: 'M', parents: ['g1_m1', 'g1_f1'], children: ['g3_m3'], spouses: ['g2_f2'], bio: '大川的弟弟，長居南部。', posts: [], claimed: false },
-  'g2_f2': { id: 'g2_f2', name: '周惠', gender: 'F', parents: [], children: ['g3_m3'], spouses: ['g2_m2'], bio: '賢內助，廚藝極佳。', posts: [], claimed: false },
-  'm3': { id: 'm3', name: '王建國', gender: 'M', parents: ['m1', 'm2'], children: ['m5', 'g4_f1'], spouses: ['m6'], bio: '長子，目前在科技業擔任工程師。', posts: [], claimed: true },
-  'm6': { id: 'm6', name: '陳淑芬', gender: 'F', parents: [], children: ['m5', 'g4_f1'], spouses: ['m3'], bio: '溫柔體貼，喜歡烹飪。', posts: [], claimed: false },
-  'm4': { id: 'm4', name: '王心凌', gender: 'F', parents: ['m1', 'm2'], children: ['g4_m1'], spouses: ['g3_m1'], bio: '小女兒，自由撰稿人。', posts: [{ id: 'p2', date: '2026-01-05', text: '剛完成了一本新書的初稿！' }], claimed: false },
-  'g3_m1': { id: 'g3_m1', name: '李大為', gender: 'M', parents: [], children: ['g4_m1'], spouses: ['m4'], bio: '攝影師，喜歡四處旅遊。', posts: [], claimed: false },
-  'g3_m3': { id: 'g3_m3', name: '王志強', gender: 'M', parents: ['g2_m2', 'g2_f2'], children: ['g4_m2'], spouses: ['g3_f2'], bio: '建國的堂弟，從事貿易。', posts: [], claimed: false },
-  'g3_f2': { id: 'g3_f2', name: '吳梅', gender: 'F', parents: [], children: ['g4_m2'], spouses: ['g3_m3'], bio: '高中教師。', posts: [], claimed: false },
-  'm5': { id: 'm5', name: '王小明', gender: 'M', parents: ['m3', 'm6'], children: ['g5_m1'], spouses: ['g4_f2'], bio: '活潑好動，目前是公司主管。', posts: [], claimed: false },
-  'g4_f2': { id: 'g4_f2', name: '張欣', gender: 'F', parents: [], children: ['g5_m1'], spouses: ['m5'], bio: '銀行職員，心思細膩。', posts: [], claimed: false },
-  'g4_f1': { id: 'g4_f1', name: '王曉華', gender: 'F', parents: ['m3', 'm6'], children: ['g5_f1'], spouses: ['g4_m3'], bio: '設計師，充滿創意。', posts: [], claimed: false },
-  'g4_m3': { id: 'g4_m3', name: '林俊傑', gender: 'M', parents: [], children: ['g5_f1'], spouses: ['g4_f1'], bio: '建築師。', posts: [], claimed: false },
-  'g4_m1': { id: 'g4_m1', name: '李子豪', gender: 'M', parents: ['m4', 'g3_m1'], children: [], spouses: [], bio: '大學生，熱愛籃球。', posts: [], claimed: false },
-  'g4_m2': { id: 'g4_m2', name: '王宇', gender: 'M', parents: ['g3_m3', 'g3_f2'], children: [], spouses: [], bio: '留學海外中。', posts: [], claimed: false },
-  'g5_m1': { id: 'g5_m1', name: '王星', gender: 'M', parents: ['m5', 'g4_f2'], children: [], spouses: [], bio: '剛滿三歲，全家的開心果。', posts: [], claimed: false },
-  'g5_f1': { id: 'g5_f1', name: '林芸', gender: 'F', parents: ['g4_f1', 'g4_m3'], children: [], spouses: [], bio: '小學一年級。', posts: [], claimed: false },
+  'g1_m1': { id: 'g1_m1', name: '王天明', gender: 'M', birthday: '1942-03-15', parents: [], children: ['m1', 'g2_m2'], spouses: ['g1_f1'], bio: '家族開創者，當年白手起家。', posts: [], claimed: false },
+  'g1_f1': { id: 'g1_f1', name: '李玉蘭', gender: 'F', birthday: '1945-08-02', parents: [], children: ['m1', 'g2_m2'], spouses: ['g1_m1'], bio: '溫柔堅毅，持家有道。', posts: [], claimed: false },
+  'm1': { id: 'm1', name: '王大川', gender: 'M', birthday: '1968-01-20', parents: ['g1_m1', 'g1_f1'], children: ['m3', 'm4'], spouses: ['m2'], bio: '家族大家長，熱愛書法與園藝。', posts: [{ id: 'p1', date: '2025-10-10', text: '今天在後院種下了一棵櫻花樹，希望子孫滿堂。' }], claimed: true },
+  'm2': { id: 'm2', name: '林美麗', gender: 'F', birthday: '1970-11-05', parents: [], children: ['m3', 'm4'], spouses: ['m1'], bio: '慈祥的祖母，拿手好菜是紅燒肉。', posts: [], claimed: false },
+  'g2_m2': { id: 'g2_m2', name: '王二川', gender: 'M', birthday: '1972-06-18', parents: ['g1_m1', 'g1_f1'], children: ['g3_m3'], spouses: ['g2_f2'], bio: '大川的弟弟，長居南部。', posts: [], claimed: false },
+  'g2_f2': { id: 'g2_f2', name: '周惠', gender: 'F', birthday: '1974-04-12', parents: [], children: ['g3_m3'], spouses: ['g2_m2'], bio: '賢內助，廚藝極佳。', posts: [], claimed: false },
+  'm3': { id: 'm3', name: '王建國', gender: 'M', birthday: '1993-05-09', parents: ['m1', 'm2'], children: ['m5', 'g4_f1'], spouses: ['m6'], bio: '長子，目前在科技業擔任工程師。', posts: [], claimed: true },
+  'm6': { id: 'm6', name: '陳淑芬', gender: 'F', birthday: '1994-09-21', parents: [], children: ['m5', 'g4_f1'], spouses: ['m3'], bio: '溫柔體貼，喜歡烹飪。', posts: [], claimed: false },
+  'm4': { id: 'm4', name: '王心凌', gender: 'F', birthday: '1996-02-14', parents: ['m1', 'm2'], children: ['g4_m1'], spouses: ['g3_m1'], bio: '小女兒，自由撰稿人。', posts: [{ id: 'p2', date: '2026-01-05', text: '剛完成了一本新書的初稿！' }], claimed: false },
+  'g3_m1': { id: 'g3_m1', name: '李大為', gender: 'M', birthday: '1992-12-01', parents: [], children: ['g4_m1'], spouses: ['m4'], bio: '攝影師，喜歡四處旅遊。', posts: [], claimed: false },
+  'g3_m3': { id: 'g3_m3', name: '王志強', gender: 'M', birthday: '1995-07-30', parents: ['g2_m2', 'g2_f2'], children: ['g4_m2'], spouses: ['g3_f2'], bio: '建國的堂弟，從事貿易。', posts: [], claimed: false },
+  'g3_f2': { id: 'g3_f2', name: '吳梅', gender: 'F', birthday: '1996-10-10', parents: [], children: ['g4_m2'], spouses: ['g3_m3'], bio: '高中教師。', posts: [], claimed: false },
+  'm5': { id: 'm5', name: '王小明', gender: 'M', birthday: '2018-03-03', parents: ['m3', 'm6'], children: ['g5_m1'], spouses: ['g4_f2'], bio: '活潑好動，目前是公司主管。', posts: [], claimed: false },
+  'g4_f2': { id: 'g4_f2', name: '張欣', gender: 'F', birthday: '2019-01-17', parents: [], children: ['g5_m1'], spouses: ['m5'], bio: '銀行職員，心思細膩。', posts: [], claimed: false },
+  'g4_f1': { id: 'g4_f1', name: '王曉華', gender: 'F', birthday: '2020-07-08', parents: ['m3', 'm6'], children: ['g5_f1'], spouses: ['g4_m3'], bio: '設計師，充滿創意。', posts: [], claimed: false },
+  'g4_m3': { id: 'g4_m3', name: '林俊傑', gender: 'M', birthday: '2019-09-28', parents: [], children: ['g5_f1'], spouses: ['g4_f1'], bio: '建築師。', posts: [], claimed: false },
+  'g4_m1': { id: 'g4_m1', name: '李子豪', gender: 'M', birthday: '2021-05-26', parents: ['m4', 'g3_m1'], children: [], spouses: [], bio: '大學生，熱愛籃球。', posts: [], claimed: false },
+  'g4_m2': { id: 'g4_m2', name: '王宇', gender: 'M', birthday: '2022-08-14', parents: ['g3_m3', 'g3_f2'], children: [], spouses: [], bio: '留學海外中。', posts: [], claimed: false },
+  'g5_m1': { id: 'g5_m1', name: '王星', gender: 'M', birthday: '2023-04-22', parents: ['m5', 'g4_f2'], children: [], spouses: [], bio: '剛滿三歲，全家的開心果。', posts: [], claimed: false },
+  'g5_f1': { id: 'g5_f1', name: '林芸', gender: 'F', birthday: '2024-02-11', parents: ['g4_f1', 'g4_m3'], children: [], spouses: [], bio: '小學一年級。', posts: [], claimed: false },
 };
 
 const LOCAL_STORAGE_KEY = 'familytree.autosave.v1';
@@ -77,6 +77,126 @@ const readSavedTree = () => {
   }
 };
 
+const normalizeMembers = (membersMap) => {
+  const source = membersMap || {};
+  return Object.fromEntries(
+    Object.entries(source).map(([id, member]) => [
+      id,
+      {
+        ...member,
+        birthday: member?.birthday || '',
+      },
+    ])
+  );
+};
+
+const getTimestampFromBirthday = (birthday) => {
+  if (!birthday || typeof birthday !== 'string') return null;
+  const ts = Date.parse(birthday);
+  return Number.isNaN(ts) ? null : ts;
+};
+
+const getOlderLabel = (isOlder, olderLabel, youngerLabel, fallbackLabel) => {
+  if (isOlder === null) return fallbackLabel;
+  return isOlder ? olderLabel : youngerLabel;
+};
+
+const compareBirthdayOrder = (aBirthday, bBirthday) => {
+  const aTs = getTimestampFromBirthday(aBirthday);
+  const bTs = getTimestampFromBirthday(bBirthday);
+  if (aTs === null || bTs === null || aTs === bTs) return null;
+  return aTs < bTs;
+};
+
+const TANG_BROTHER_PATTERNS = new Set(['F,F,S,S', 'F,M,S,S']);
+const TANG_SISTER_PATTERNS = new Set(['F,F,S,D', 'F,M,S,D']);
+const BIAO_BROTHER_PATTERNS = new Set([
+  'F,F,D,S', 'F,M,D,S',
+  'M,F,S,S', 'M,M,S,S',
+  'M,F,D,S', 'M,M,D,S',
+]);
+const BIAO_SISTER_PATTERNS = new Set([
+  'F,F,D,D', 'F,M,D,D',
+  'M,F,S,D', 'M,M,S,D',
+  'M,F,D,D', 'M,M,D,D',
+]);
+
+const getCousinTypeByPath = (path) => {
+  const p = path.join(',');
+  if (TANG_BROTHER_PATTERNS.has(p) || TANG_SISTER_PATTERNS.has(p)) return 'tang';
+  if (BIAO_BROTHER_PATTERNS.has(p) || BIAO_SISTER_PATTERNS.has(p)) return 'biao';
+
+  if (p.includes('F,F,S,') || p.includes('F,M,S,')) return 'tang';
+  if (p.includes('M,F,') || p.includes('M,M,') || p.includes('F,F,D,') || p.includes('F,M,D,')) return 'biao';
+  return null;
+};
+
+const resolveSiblingKinship = (fromId, toId, members, path, targetGender) => {
+  if (path.length !== 2) return null;
+  if (!['F', 'M'].includes(path[0]) || !['S', 'D'].includes(path[1])) return null;
+
+  const from = members[fromId];
+  const to = members[toId];
+  if (!from || !to) return null;
+
+  const sharedParent = (from.parents || []).some(pid => (to.parents || []).includes(pid));
+  if (!sharedParent) return null;
+
+  const fromTs = getTimestampFromBirthday(from.birthday);
+  const toTs = getTimestampFromBirthday(to.birthday);
+  if (fromTs === null || toTs === null || fromTs === toTs) {
+    return targetGender === 'M' ? '兄弟' : '姊妹';
+  }
+
+  const isOlder = toTs < fromTs;
+  if (targetGender === 'M') return isOlder ? '哥哥' : '弟弟';
+  return isOlder ? '姊姊' : '妹妹';
+};
+
+const resolveAgeAwareKinship = (fromId, toId, members, path) => {
+  const from = members[fromId];
+  const to = members[toId];
+  if (!from || !to) return null;
+
+  const siblingKinship = resolveSiblingKinship(fromId, toId, members, path, to.gender);
+  if (siblingKinship) return siblingKinship;
+
+  // 伯/叔、姑媽/姑姑、大舅/小舅、姨媽/阿姨
+  if (path.length === 3 && (path[2] === 'S' || path[2] === 'D') && (path[0] === 'F' || path[0] === 'M')) {
+    const referenceParent = (from.parents || []).find(pid => members[pid] && (path[0] === 'F' ? members[pid].gender === 'M' : members[pid].gender === 'F'));
+    const isOlderThanParent = referenceParent ? compareBirthdayOrder(to.birthday, members[referenceParent].birthday) : null;
+
+    if (path[0] === 'F' && path[2] === 'S') {
+      return getOlderLabel(isOlderThanParent, '伯伯', '叔叔', '伯伯/叔叔');
+    }
+    if (path[0] === 'F' && path[2] === 'D') {
+      return getOlderLabel(isOlderThanParent, '姑媽', '姑姑', '姑姑');
+    }
+    if (path[0] === 'M' && path[2] === 'S') {
+      return getOlderLabel(isOlderThanParent, '大舅', '小舅', '舅舅');
+    }
+    if (path[0] === 'M' && path[2] === 'D') {
+      return getOlderLabel(isOlderThanParent, '姨媽', '阿姨', '阿姨');
+    }
+  }
+
+  // 堂/表 + 哥弟姊妹
+  if (path.length >= 4 && (path[path.length - 1] === 'S' || path[path.length - 1] === 'D')) {
+    const cousinType = getCousinTypeByPath(path);
+    if (cousinType) {
+      const isOlderThanMe = compareBirthdayOrder(to.birthday, from.birthday);
+      const prefix = cousinType === 'tang' ? '堂' : '表';
+
+      if (to.gender === 'M') {
+        return getOlderLabel(isOlderThanMe, `${prefix}哥`, `${prefix}弟`, `${prefix}兄弟`);
+      }
+      return getOlderLabel(isOlderThanMe, `${prefix}姊`, `${prefix}妹`, `${prefix}姊妹`);
+    }
+  }
+
+  return null;
+};
+
 // ==========================================
 // 2. 稱謂計算系統 (Kinship Calculator)
 // ==========================================
@@ -98,10 +218,13 @@ const translatePath = (path, targetGender) => {
     'H,S': '繼子', 'W,S': '繼子', 'H,D': '繼女', 'W,D': '繼女',
   };
   if (map[p]) return map[p];
-  if (p.includes('F,F,') || p.includes('F,M,') || p.includes('M,F,') || p.includes('M,M,')) {
-     if (p.endsWith('S')) return '堂/表兄弟';
-     if (p.endsWith('D')) return '堂/表姊妹';
+
+  const cousinType = getCousinTypeByPath(path);
+  if (cousinType) {
+    if (p.endsWith('S')) return cousinType === 'tang' ? '堂兄弟' : '表兄弟';
+    if (p.endsWith('D')) return cousinType === 'tang' ? '堂姊妹' : '表姊妹';
   }
+
   return '親戚';
 };
 
@@ -114,7 +237,11 @@ const calculateKinship = (fromId, toId, members) => {
     if (path.length > 4) continue;
     let current = members[id];
     if (!current) continue;
-    if (id === toId) return translatePath(path, members[toId].gender);
+    if (id === toId) {
+      const ageAwareKinship = resolveAgeAwareKinship(fromId, toId, members, path);
+      if (ageAwareKinship) return ageAwareKinship;
+      return translatePath(path, members[toId].gender);
+    }
 
     current.parents.forEach(pid => {
       if (!visited.has(pid) && members[pid]) { visited.add(pid); queue.push({ id: pid, path: [...path, members[pid].gender === 'M' ? 'F' : 'M'] }); }
@@ -134,7 +261,7 @@ const calculateKinship = (fromId, toId, members) => {
 // ==========================================
 export default function App() {
   const [treeName, setTreeName] = useState('王家大族譜'); // 新增：族譜名稱狀態
-  const [members, setMembers] = useState(INITIAL_MEMBERS);
+  const [members, setMembers] = useState(() => normalizeMembers(INITIAL_MEMBERS));
   const [meId, setMeId] = useState('m3');
   const [selectedId, setSelectedId] = useState(null);
   const [isStartOpen, setIsStartOpen] = useState(true);
@@ -184,7 +311,7 @@ export default function App() {
     if (!shared) return;
 
     setTreeName(shared.treeName);
-    setMembers(shared.members);
+    setMembers(normalizeMembers(shared.members));
     setMeId(shared.meId);
     setSelectedId(null);
     setSuppressProfilePanel(false);
@@ -209,7 +336,7 @@ export default function App() {
   }, [treeName, members, meId, isStartOpen]);
 
   const handleUpdateMembers = (newMembersMap, targetId) => {
-    setMembers(newMembersMap);
+    setMembers(normalizeMembers(newMembersMap));
     setSelectedId(targetId);
     setIsQAOpen(false);
   };
@@ -255,7 +382,7 @@ export default function App() {
     const nextIds = Object.keys(draft);
     if (selectedId && toDelete.has(selectedId)) setSelectedId(null);
     if (meId && toDelete.has(meId)) setMeId(nextIds[0] || null);
-    setMembers(draft);
+    setMembers(normalizeMembers(draft));
   };
 
   const handleAddPost = (text) => {
@@ -289,7 +416,7 @@ export default function App() {
       return;
     }
     setTreeName(saved.treeName);
-    setMembers(saved.members);
+    setMembers(normalizeMembers(saved.members));
     setMeId(saved.meId);
     setSelectedId(null);
     setSuppressProfilePanel(false);
@@ -384,10 +511,10 @@ export default function App() {
         const json = JSON.parse(event.target.result);
         if (json.treeName && json.members) {
            setTreeName(json.treeName);
-           setMembers(json.members);
+            setMembers(normalizeMembers(json.members));
         } else {
            setTreeName('載入的族譜');
-           setMembers(json);
+            setMembers(normalizeMembers(json));
         }
         setMeId(Object.keys(json.members || json)[0]); // 重設視角
         setIsStartOpen(false);
@@ -577,11 +704,11 @@ export default function App() {
       {isResetOpen && (
         <ResetModal 
           onClose={() => setIsResetOpen(false)}
-          onReset={(newName, newGender, newTreeName) => {
+          onReset={(newName, newGender, newTreeName, newBirthday) => {
             const newId = generateId();
             const newMember = {
               id: newId, name: newName, gender: newGender,
-              parents: [], children: [], spouses: [], bio: '族譜建立者', posts: [], claimed: true
+              parents: [], children: [], spouses: [], bio: '族譜建立者', posts: [], claimed: true, birthday: newBirthday || ''
             };
             setTreeName(newTreeName);
             setMembers({ [newId]: newMember });
@@ -601,7 +728,7 @@ export default function App() {
           }}
           onLoadTemplate={() => {
             setTreeName('王家大族譜');
-            setMembers(INITIAL_MEMBERS);
+            setMembers(normalizeMembers(INITIAL_MEMBERS));
             setMeId('m3');
             setSelectedId(null);
             setIsStartOpen(false);
@@ -1569,6 +1696,15 @@ const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRel
 
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <h3 className="text-sm font-bold text-gray-500 mb-2 flex items-center gap-2"><Info size={16}/> 個人事蹟</h3>
+          <div className="mb-3">
+            <label className="block text-xs font-bold text-gray-500 mb-1">生日</label>
+            <input
+              type="date"
+              value={member.birthday || ''}
+              onChange={(e) => onUpdateMember(member.id, { birthday: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
           <p className="text-gray-700 leading-relaxed text-sm">
             {member.bio || '尚未留下個人簡介。'}
           </p>
@@ -1675,13 +1811,13 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
   }, [context]);
 
   const [formData, setFormData] = useState({
-    name: '', gender: 'M',
+    name: '', gender: 'M', birthday: '',
     relativeId: context?.relativeId || Object.keys(members)[0],
     relationType: context?.relationType || 'child'
   });
 
   const [textData, setTextData] = useState({
-    name: '', gender: 'M',
+    name: '', gender: 'M', birthday: '',
     relativeId: context?.relativeId || Object.keys(members)[0],
     relationText: ''
   });
@@ -1720,7 +1856,7 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
       } else if (relType === 'sibling') {
         if (n1.parents.length === 0) {
           let dummyF = generateId();
-          draft[dummyF] = { id: dummyF, name: '未知(父親)', gender: 'M', parents: [], children: [id1, id2], spouses: [], bio: '', posts: [], claimed: false };
+          draft[dummyF] = { id: dummyF, name: '未知(父親)', gender: 'M', birthday: '', parents: [], children: [id1, id2], spouses: [], bio: '', posts: [], claimed: false };
           addUnique(n1.parents, dummyF);
           addUnique(n2.parents, dummyF);
         } else {
@@ -1738,7 +1874,7 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
     e.preventDefault();
     let draft = JSON.parse(JSON.stringify(members));
     let newId = generateId();
-    draft[newId] = { id: newId, name: formData.name, gender: formData.gender, parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
+    draft[newId] = { id: newId, name: formData.name, gender: formData.gender, birthday: formData.birthday || '', parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
     linkNodes(draft, formData.relativeId, newId, formData.relationType);
     onSubmit(draft, newId);
   };
@@ -1783,14 +1919,14 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
 
               if (isLast) {
                   let newId = generateId();
-                  draft[newId] = { id: newId, name: textData.name || `新成員`, gender: textData.gender, parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
+                  draft[newId] = { id: newId, name: textData.name || `新成員`, gender: textData.gender, birthday: textData.birthday || '', parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
                   linkNodes(draft, currentId, newId, relType);
                   currentId = newId;
               } else {
                   let nextId = findExistingRelation(draft, currentId, relType, gender);
                   if (!nextId) {
                       nextId = generateId();
-                      draft[nextId] = { id: nextId, name: `未知(${step})`, gender: gender, parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
+                      draft[nextId] = { id: nextId, name: `未知(${step})`, gender: gender, birthday: '', parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
                       linkNodes(draft, currentId, nextId, relType);
                   }
                   currentId = nextId;
@@ -1831,6 +1967,7 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
                   <div className="space-y-2 pt-2 border-t border-gray-100">
                      <label className="block text-sm font-bold text-gray-700">3. 新成員姓名與性別</label>
                      <input type="text" required placeholder="輸入最終這位新成員的姓名" value={textData.name} onChange={e => setTextData({...textData, name: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none mb-2" />
+                    <input type="date" value={textData.birthday} onChange={e => setTextData({...textData, birthday: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none mb-2" />
                      <div className="flex gap-4">
                        <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${textData.gender === 'M' ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="M" className="hidden" onChange={() => setTextData({...textData, gender: 'M'})} /> ♂ 男性</label>
                        <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${textData.gender === 'F' ? 'border-pink-500 bg-pink-50 text-pink-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="F" className="hidden" onChange={() => setTextData({...textData, gender: 'F'})} /> ♀ 女性</label>
@@ -1855,6 +1992,7 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
                   <div className="space-y-2 pt-2 border-t border-gray-100">
                      <label className="block text-sm font-bold text-gray-700">2. 基本資料</label>
                      <input autoFocus type="text" required placeholder="輸入姓名" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 text-lg focus:ring-2 focus:ring-emerald-500 outline-none mb-2" />
+                    <input type="date" value={formData.birthday} onChange={e => setFormData({...formData, birthday: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none mb-2" />
                      <div className="flex gap-4">
                        <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${formData.gender === 'M' ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="M" className="hidden" onChange={() => setFormData({...formData, gender: 'M'})} /> ♂ 男性</label>
                        <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${formData.gender === 'F' ? 'border-pink-500 bg-pink-50 text-pink-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="F" className="hidden" onChange={() => setFormData({...formData, gender: 'F'})} /> ♀ 女性</label>
@@ -1899,11 +2037,12 @@ const ResetModal = ({ onClose, onReset }) => {
   const [treeName, setTreeName] = useState('我的家族族譜');
   const [name, setName] = useState('');
   const [gender, setGender] = useState('M');
+  const [birthday, setBirthday] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (name.trim() && treeName.trim()) {
-      onReset(name.trim(), gender, treeName.trim());
+      onReset(name.trim(), gender, treeName.trim(), birthday);
     }
   };
 
@@ -1936,6 +2075,11 @@ const ResetModal = ({ onClose, onReset }) => {
                  <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${gender === 'M' ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="M" className="hidden" onChange={() => setGender('M')} /> ♂ 男性</label>
                  <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${gender === 'F' ? 'border-pink-500 bg-pink-50 text-pink-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="F" className="hidden" onChange={() => setGender('F')} /> ♀ 女性</label>
                </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-gray-700">您的生日 (選填)</label>
+              <input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-red-500 outline-none" />
             </div>
 
             <button type="submit" className="w-full mt-4 bg-red-500 text-white font-bold text-lg py-4 rounded-xl shadow-lg hover:bg-red-600 transition">確認清空並建立</button>
