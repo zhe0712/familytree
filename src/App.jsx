@@ -238,16 +238,16 @@ export default function App() {
         
         {/* 手機版與桌面版相容的頂部控制列 */}
         <div className="absolute top-2 left-2 right-2 md:top-4 md:left-4 md:right-4 flex justify-between items-start pointer-events-none z-20">
-          <div className="bg-white/90 backdrop-blur-md shadow-lg rounded-2xl p-3 md:px-6 md:py-3 flex flex-col gap-2 pointer-events-auto border border-gray-100 max-w-[85%] md:max-w-none">
+          <div className="bg-white/90 backdrop-blur-md shadow-lg rounded-2xl p-2 md:px-6 md:py-3 flex flex-col gap-1.5 md:gap-2 pointer-events-auto border border-gray-100 max-w-[78%] md:max-w-none">
             <div className="flex items-center gap-2 md:gap-3">
               <div className="p-1.5 md:p-2 bg-emerald-100 text-emerald-700 rounded-xl shrink-0">
-                <Share2 size={20} className="md:w-6 md:h-6" />
+                <Share2 size={18} className="md:w-6 md:h-6" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-lg md:text-xl font-bold text-gray-800 tracking-wide truncate">
+                <h1 className="text-base md:text-xl font-bold text-gray-800 tracking-wide truncate">
                   {treeName}
                 </h1>
-                <div className="text-xs text-gray-500 flex items-center gap-1 font-medium mt-1">
+                <div className="text-[11px] md:text-xs text-gray-500 flex items-center gap-1 font-medium mt-0.5 md:mt-1">
                   <span>視角: </span>
                   <select 
                     className="bg-transparent font-bold text-emerald-600 outline-none cursor-pointer max-w-[80px] md:max-w-none truncate"
@@ -266,7 +266,7 @@ export default function App() {
             </div>
             
             {/* 手機版/桌面版 操作列 (使用 flex-wrap 適應小螢幕) */}
-            <div className="flex flex-wrap items-center gap-1.5 md:gap-2 text-xs md:text-sm text-gray-500 mt-1 md:mt-0">
+            <div className="flex flex-wrap items-center gap-1 md:gap-2 text-[11px] md:text-sm text-gray-500 mt-0.5 md:mt-0">
               <button onClick={handleExportJSON} className="hover:text-emerald-600 flex items-center gap-1 transition p-1 bg-gray-50/50 rounded">
                 <Download size={14}/> <span className="hidden sm:inline">儲存</span>
               </button>
@@ -280,7 +280,7 @@ export default function App() {
               </button>
             </div>
 
-            <div className="relative mt-1">
+            <div className="relative mt-1 hidden md:block">
               <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
                 <Search size={15} className="text-gray-400" />
                 <input
@@ -333,7 +333,7 @@ export default function App() {
         {/* 快速新增按鈕：手機版改為右下角懸浮 (Floating Action Button) */}
         <button 
           onClick={() => { setQaContext({ relativeId: selectedId || meId, relationType: 'child' }); setIsQAOpen(true); }}
-          className={`absolute bottom-6 left-6 md:left-auto md:bottom-4 md:top-auto ${selectedMember ? 'md:right-[25rem]' : 'md:right-4'} bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl md:shadow-lg rounded-full md:rounded-2xl p-4 md:px-5 md:py-3 flex items-center gap-2 pointer-events-auto transition-transform hover:scale-105 z-40`}
+          className={`absolute bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 md:left-auto md:bottom-4 md:top-auto ${selectedMember ? 'md:right-[25rem]' : 'md:right-4'} bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl md:shadow-lg rounded-full md:rounded-2xl p-4 md:px-5 md:py-3 flex items-center gap-2 pointer-events-auto transition-transform hover:scale-105 z-40`}
         >
           <UserPlus size={24} className="md:w-5 md:h-5" />
           <span className="font-semibold hidden md:inline">快速新增</span>
@@ -427,6 +427,7 @@ export default function App() {
 // ==========================================
 const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighlightId }) => {
   const canvasRef = useRef(null);
+  const dprRef = useRef(typeof window !== 'undefined' ? Math.max(1, window.devicePixelRatio || 1) : 1);
   
   const engineRef = useRef({
     nodes: [],
@@ -701,8 +702,15 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
     let animationFrameId;
 
     const resize = () => {
-      canvas.width = canvas.parentElement.clientWidth;
-      canvas.height = canvas.parentElement.clientHeight;
+      const cssWidth = canvas.parentElement.clientWidth;
+      const cssHeight = canvas.parentElement.clientHeight;
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      dprRef.current = dpr;
+
+      canvas.width = Math.floor(cssWidth * dpr);
+      canvas.height = Math.floor(cssHeight * dpr);
+      canvas.style.width = `${cssWidth}px`;
+      canvas.style.height = `${cssHeight}px`;
     };
     window.addEventListener('resize', resize);
     resize();
@@ -766,7 +774,10 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
         }
       }
 
+      const dpr = dprRef.current;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.save();
       ctx.translate(transform.x, transform.y);
       ctx.scale(transform.scale, transform.scale);
@@ -1140,7 +1151,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
         className="w-full h-full block"
       />
       
-      <div className="absolute bottom-6 left-6 md:left-6 flex flex-col gap-2 pointer-events-auto z-20">
+        <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-4 md:bottom-6 md:left-6 flex flex-col gap-2 pointer-events-auto z-30">
          <button onClick={() => engineRef.current.transform.scale *= 1.2} className="p-3 md:p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"><ZoomIn size={20}/></button>
          <button onClick={() => engineRef.current.transform.scale *= 0.8} className="p-3 md:p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"><ZoomOut size={20}/></button>
          <button onClick={() => {
