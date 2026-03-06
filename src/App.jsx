@@ -102,6 +102,7 @@ export default function App() {
   const [searchFocusId, setSearchFocusId] = useState(null);
   const [searchFocusKey, setSearchFocusKey] = useState(0);
   const [searchHighlightId, setSearchHighlightId] = useState(null);
+  const [suppressProfilePanel, setSuppressProfilePanel] = useState(false);
   
   const [isQAOpen, setIsQAOpen] = useState(false);
   const [qaContext, setQaContext] = useState(null); 
@@ -120,7 +121,7 @@ export default function App() {
 
   useEffect(() => {
     if (!searchHighlightId) return;
-    const timer = setTimeout(() => setSearchHighlightId(null), 8000);
+    const timer = setTimeout(() => setSearchHighlightId(null), 4000);
     return () => clearTimeout(timer);
   }, [searchHighlightId]);
 
@@ -183,11 +184,17 @@ export default function App() {
   const handleSelectFromSearch = (id) => {
     if (!members[id]) return;
     const isMobileViewport = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
-    setSelectedId(isMobileViewport ? null : id);
+    setSelectedId(id);
+    setSuppressProfilePanel(isMobileViewport);
     setSearchFocusId(id);
     setSearchFocusKey(prev => prev + 1);
     setSearchHighlightId(id);
     setSearchQuery(members[id].name);
+      const handleCanvasSelect = (id) => {
+        setSuppressProfilePanel(false);
+        setSelectedId(id);
+      };
+
     setIsSearchOpen(false);
     setIsMobileSearchOpen(false);
   };
@@ -235,7 +242,7 @@ export default function App() {
         <CanvasTree 
           members={members} 
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={handleCanvasSelect}
           meId={meId}
           focusId={searchFocusId}
           focusKey={searchFocusKey}
@@ -351,13 +358,16 @@ export default function App() {
         </button>
       </div>
 
-      <div className={`w-[92vw] sm:w-96 bg-white shadow-2xl z-30 flex flex-col transition-transform duration-500 ease-in-out absolute right-0 h-full ${selectedMember ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`w-[92vw] sm:w-96 bg-white shadow-2xl z-30 flex flex-col transition-transform duration-500 ease-in-out absolute right-0 h-full ${selectedMember && !suppressProfilePanel ? 'translate-x-0' : 'translate-x-full'}`}>
         {selectedMember && (
           <ProfilePanel 
             member={selectedMember} 
             kinship={calculateKinship(meId, selectedId, members)}
             meId={meId}
-            onClose={() => setSelectedId(null)}
+            onClose={() => {
+              setSuppressProfilePanel(false);
+              setSelectedId(null);
+            }}
             onSetViewpoint={(id) => setMeId(id)}
             onAddRelative={(type) => {
               setQaContext({
@@ -1020,18 +1030,13 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
 
         if (isSearchHit && !n.isHidden) {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius + 22, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(245, 158, 11, 0.28)';
+          ctx.arc(n.x, n.y, n.radius + 18, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
           ctx.fill();
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius + 18, 0, Math.PI * 2);
-          ctx.lineWidth = 4;
+          ctx.arc(n.x, n.y, n.radius + 15, 0, Math.PI * 2);
+          ctx.lineWidth = 3;
           ctx.strokeStyle = '#f59e0b';
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius + 10, 0, Math.PI * 2);
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = '#fde68a';
           ctx.stroke();
         }
 
