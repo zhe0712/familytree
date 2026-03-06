@@ -776,10 +776,24 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
     if (!node || !canvas) return;
 
     const targetScale = Math.max(0.75, engine.transform.scale);
-    const rect = canvas.getBoundingClientRect();
-    engine.transform.scale = targetScale;
-    engine.transform.x = rect.width / 2 - node.x * targetScale;
-    engine.transform.y = rect.height / 2 - node.y * targetScale;
+    const recenter = () => {
+      const currentNode = engine.nodes.find(n => n.id === focusId);
+      if (!currentNode || !canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      engine.transform.scale = targetScale;
+      engine.transform.x = rect.width / 2 - currentNode.x * targetScale;
+      engine.transform.y = rect.height / 2 - currentNode.y * targetScale;
+    };
+
+    recenter();
+
+    // Desktop sidebar and layout transitions can shift viewport after first center.
+    const t1 = setTimeout(recenter, 120);
+    const t2 = setTimeout(recenter, 380);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [focusId, focusKey, members]);
 
   useEffect(() => {
