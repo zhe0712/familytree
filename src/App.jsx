@@ -295,6 +295,132 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
     pinchStartScale: 1
   });
 
+  const collectHiddenNodes = useCallback((nodes, collapsedNodes) => {
+    const hiddenNodes = new Set();
+    const queue = [...collapsedNodes];
+
+    while (queue.length > 0) {
+      const pid = queue.shift();
+      const parentNode = nodes.find(n => n.id === pid);
+      if (!parentNode || !parentNode.data.children) continue;
+      parentNode.data.children.forEach(cid => {
+        if (!hiddenNodes.has(cid)) {
+          hiddenNodes.add(cid);
+          queue.push(cid);
+        }
+      });
+    }
+
+    nodes.forEach(n => {
+      if (hiddenNodes.has(n.id)) {
+        n.data.spouses.forEach(sid => hiddenNodes.add(sid));
+      }
+    });
+
+    return hiddenNodes;
+  }, []);
+
+  const computeLayoutTargets = useCallback((engine, hiddenNodes) => {
+    const { nodes, links, families } = engine;
+    const rowSpacing = 230;
+    const colSpacing = 170;
+    const spouseGap = 130;
+
+    const genMap = new Map();
+    nodes.forEach(n => {
+      n.isHidden = hiddenNodes.has(n.id);
+      if (!n.isHidden) {
+        if (!genMap.has(n.gen)) genMap.set(n.gen, []);
+        genMap.get(n.gen).push(n);
+      }
+    });
+
+    const sortedGens = [...genMap.keys()].sort((a, b) => a - b);
+
+    sortedGens.forEach(gen => {
+      const row = genMap.get(gen);
+      row.sort((a, b) => {
+        const aFamily = a.data.parents.length ? [...a.data.parents].sort().join(',') : a.id;
+        const bFamily = b.data.parents.length ? [...b.data.parents].sort().join(',') : b.id;
+        if (aFamily !== bFamily) return aFamily.localeCompare(bFamily);
+        const aSpouseKey = a.data.spouses.slice().sort().join(',');
+        const bSpouseKey = b.data.spouses.slice().sort().join(',');
+        if (aSpouseKey !== bSpouseKey) return aSpouseKey.localeCompare(bSpouseKey);
+        return a.id.localeCompare(b.id);
+      });
+
+      let cursor = -((row.length - 1) * colSpacing) / 2;
+      row.forEach(n => {
+        if (typeof n.targetX !== 'number') n.targetX = n.x;
+        n.targetX = cursor;
+        n.targetY = n.gen * rowSpacing;
+        cursor += colSpacing;
+      });
+    });
+
+    // Keep spouse nodes adjacent to reduce long crossing links.
+    links.forEach(link => {
+      if (link.type !== 'spouse') return;
+      const a = link.source;
+      const b = link.target;
+      if (a.isHidden || b.isHidden) return;
+      const centerX = (a.targetX + b.targetX) / 2;
+      a.targetX = centerX - spouseGap / 2;
+      b.targetX = centerX + spouseGap / 2;
+    });
+
+    // Anchor children near their parent group center.
+    families.forEach(fam => {
+      const parents = fam.parentIds.map(id => nodes.find(n => n.id === id)).filter(Boolean).filter(n => !n.isHidden);
+      const children = fam.childIds.map(id => nodes.find(n => n.id === id)).filter(Boolean).filter(n => !n.isHidden);
+      if (parents.length === 0 || children.length === 0) return;
+
+      const parentCenterX = parents.reduce((sum, p) => sum + p.targetX, 0) / parents.length;
+      const childSpacing = 145;
+      const totalWidth = (children.length - 1) * childSpacing;
+      const left = parentCenterX - totalWidth / 2;
+
+      children
+        .slice()
+        .sort((a, b) => a.targetX - b.targetX)
+        .forEach((child, index) => {
+          child.targetX = left + index * childSpacing;
+        });
+    });
+
+    // Final overlap resolver per generation.
+    sortedGens.forEach(gen => {
+      const row = (genMap.get(gen) || []).slice().sort((a, b) => a.targetX - b.targetX);
+      for (let i = 1; i < row.length; i++) {
+        const prev = row[i - 1];
+        const curr = row[i];
+        const related = prev.data.spouses.includes(curr.id) || curr.data.spouses.includes(prev.id);
+        const minGap = related ? 125 : 150;
+        const gap = curr.targetX - prev.targetX;
+        if (gap < minGap) {
+          curr.targetX = prev.targetX + minGap;
+        }
+      }
+
+      if (row.length > 0) {
+        const centerShift = (row[0].targetX + row[row.length - 1].targetX) / 2;
+        row.forEach(n => {
+          n.targetX -= centerShift;
+        });
+      }
+    });
+
+    // Hidden nodes collapse toward nearest parent to keep transitions smooth.
+    nodes.forEach(n => {
+      if (!n.isHidden) return;
+      const parent = nodes.find(p => n.data.parents.includes(p.id));
+      if (parent) {
+        n.targetX = parent.x;
+        n.targetY = parent.y;
+      }
+    });
+  }, []);
+
   useEffect(() => {
     const engine = engineRef.current;
     let nodeMap = {};
@@ -345,6 +471,8 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
         gen: generations[m.id] || 0,
         kinship: calculateKinship(meId, m.id, members),
         x: initX, y: initY,
+        targetX: existing ? existing.targetX : initX,
+        targetY: existing ? existing.targetY : initY,
         vx: existing ? existing.vx : 0, vy: existing ? existing.vy : 0,
         radius: 45, 
         hasChildren: m.children.length > 0,
@@ -370,6 +498,9 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
     engine.nodes = newNodes;
     engine.links = newLinks;
     engine.families = Object.values(familiesMap);
+
+    const hiddenNodes = collectHiddenNodes(engine.nodes, engine.collapsedNodes);
+    computeLayoutTargets(engine, hiddenNodes);
     
     // 清空重置時，強制置中視角
     if (isReset) {
@@ -399,99 +530,61 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
     const draw = () => {
       const engine = engineRef.current;
       const { nodes, links, transform, collapsedNodes, families } = engine;
-      
-      let hiddenNodes = new Set();
-      let queue = [...collapsedNodes];
-      while (queue.length > 0) {
-          let pid = queue.shift();
-          let pNode = nodes.find(n => n.id === pid);
-          if (pNode && pNode.data.children) {
-              pNode.data.children.forEach(cid => {
-                  if (!hiddenNodes.has(cid)) { hiddenNodes.add(cid); queue.push(cid); }
-              });
-          }
-      }
-      nodes.forEach(n => {
-          if (hiddenNodes.has(n.id)) n.data.spouses.forEach(sid => hiddenNodes.add(sid));
-      });
 
-      // 物理模擬核心 (平滑化算法)
+      const hiddenNodes = collectHiddenNodes(nodes, collapsedNodes);
+      computeLayoutTargets(engine, hiddenNodes);
+
       nodes.forEach(n => {
         n.isHidden = hiddenNodes.has(n.id);
         if (n.isHidden) {
-           let parent = nodes.find(pn => n.data.parents.includes(pn.id));
-           if (parent) {
-             n.x += (parent.x - n.x) * 0.3; n.y += (parent.y - n.y) * 0.3;
-           }
-        } else {
-           // Y 軸世代吸引力
-           let targetY = n.gen * 220;
-           n.vy += (targetY - n.y) * 0.15;
-
-           // X 軸互斥力 (對稱演算，避免爆衝)
-           nodes.forEach(n2 => {
-             // 確保每對節點只計算一次，增加穩定性
-             if (n.id < n2.id && !n2.isHidden) {
-               let dx = n.x - n2.x;
-               let dy = n.y - n2.y;
-               if (dx === 0 && dy === 0) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; }
-               let dist = Math.sqrt(dx*dx + dy*dy);
-               
-               let isSpouse = n.data.spouses.includes(n2.id);
-               let isSibling = n.data.parents.some(pid => n2.data.parents.includes(pid));
-               let isParentChild = n.data.parents.includes(n2.id) || n2.data.parents.includes(n.id);
-               
-               // 基礎安全間距
-               let minSpacing = n.radius + n2.radius + 50; 
-               
-               // 無血緣的不同家族同世代隔離加強 (防止折線交錯)
-               if (n.gen === n2.gen && !isSpouse && !isSibling && !isParentChild) {
-                   minSpacing += 200; 
-               } else if (isSpouse) {
-                   minSpacing = 130; 
-               }
-               
-               if (dist < minSpacing) {
-                 let overlap = minSpacing - dist;
-                 let nx = dx / dist;
-                 // 平滑互斥推力
-                 let force = overlap * 0.05; 
-                 n.vx += nx * force;
-                 n2.vx -= nx * force;
-               }
-             }
-           });
+          const parent = nodes.find(p => n.data.parents.includes(p.id));
+          if (parent) {
+            n.x += (parent.x - n.x) * 0.25;
+            n.y += (parent.y - n.y) * 0.25;
+          }
+          n.vx *= 0.6;
+          n.vy *= 0.6;
+          return;
         }
-      });
 
-      // 配偶水平吸引力
-      links.forEach(l => {
-        if (l.type === 'spouse' && !l.source.isHidden && !l.target.isHidden) {
-          let dx = l.target.x - l.source.x;
-          let targetDist = 140;
-          let dist = Math.abs(dx) || 1;
-          let forceX = (dist - targetDist) * 0.05 * Math.sign(dx);
-          l.source.vx += forceX;
-          l.target.vx -= forceX;
-        }
-      });
-
-      // 子女向父母群組置中吸引
-      nodes.forEach(n => {
-        if(n.data.parents.length > 0 && !n.isHidden) {
-           let parents = n.data.parents.map(pid => nodes.find(p=>p.id === pid)).filter(Boolean);
-           if (parents.length > 0) {
-               let pX = parents.reduce((sum, p) => sum + p.x, 0) / parents.length;
-               n.vx += (pX - n.x) * 0.05; 
-           }
-        }
-        
-        // 更新位置並套用阻尼摩擦力 (阻尼設為 0.5 讓移動順滑且迅速穩定)
+        n.vx = n.vx * 0.72 + (n.targetX - n.x) * 0.16;
+        n.vy = n.vy * 0.72 + (n.targetY - n.y) * 0.16;
         n.x += n.vx;
         n.y += n.vy;
-        n.vx *= 0.5; 
-        n.vy *= 0.5;
       });
+
+      // Visible node collision pass.
+      const visibleNodes = nodes.filter(n => !n.isHidden);
+      for (let pass = 0; pass < 2; pass++) {
+        for (let i = 0; i < visibleNodes.length; i++) {
+          for (let j = i + 1; j < visibleNodes.length; j++) {
+            const a = visibleNodes[i];
+            const b = visibleNodes[j];
+            let dx = b.x - a.x;
+            let dy = b.y - a.y;
+            if (dx === 0 && dy === 0) {
+              dx = 1;
+              dy = 0;
+            }
+            const dist = Math.hypot(dx, dy);
+            const isSpouse = a.data.spouses.includes(b.id);
+            const isSibling = a.data.parents.some(pid => b.data.parents.includes(pid));
+            const isParentChild = a.data.parents.includes(b.id) || b.data.parents.includes(a.id);
+            const sameGenUnrelated = a.gen === b.gen && !isSpouse && !isSibling && !isParentChild;
+            const minDist = isSpouse ? 118 : (sameGenUnrelated ? 168 : 136);
+
+            if (dist < minDist) {
+              const overlap = minDist - dist;
+              const nx = dx / dist;
+              const ny = dy / dist;
+              a.x -= nx * overlap * 0.5;
+              a.y -= ny * overlap * 0.3;
+              b.x += nx * overlap * 0.5;
+              b.y += ny * overlap * 0.3;
+            }
+          }
+        }
+      }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
@@ -502,48 +595,88 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
       ctx.lineWidth = 3;
       links.forEach(l => {
         if (l.type === 'spouse' && !l.source.isHidden && !l.target.isHidden) {
+          const midX = (l.source.x + l.target.x) / 2;
+          const archY = Math.min(l.source.y, l.target.y) - 24;
           ctx.beginPath();
-          ctx.strokeStyle = '#fca5a5'; 
+          ctx.strokeStyle = '#fca5a5';
           ctx.setLineDash([6, 6]);
-          ctx.moveTo(l.source.x, l.source.y);
-          ctx.lineTo(l.target.x, l.target.y);
+          ctx.moveTo(l.source.x, l.source.y + 4);
+          ctx.quadraticCurveTo(midX, archY, l.target.x, l.target.y + 4);
           ctx.stroke();
         }
       });
       ctx.setLineDash([]);
 
       // 繪製親子連線與收合按鈕
-      families.forEach(fam => {
-        let parents = fam.parentIds.map(id => nodes.find(n => n.id === id)).filter(Boolean);
-        let children = fam.childIds.map(id => nodes.find(n => n.id === id)).filter(Boolean);
+      const familyRows = {};
+      const familyItems = families.map(fam => {
+        const parents = fam.parentIds.map(id => nodes.find(n => n.id === id)).filter(Boolean);
+        const children = fam.childIds.map(id => nodes.find(n => n.id === id)).filter(Boolean);
+        return { fam, parents, children };
+      }).filter(item => item.parents.length > 0 && item.children.length > 0);
+
+      familyItems
+        .sort((a, b) => {
+          const aCenter = a.parents.reduce((sum, p) => sum + p.x, 0) / a.parents.length;
+          const bCenter = b.parents.reduce((sum, p) => sum + p.x, 0) / b.parents.length;
+          const aGen = Math.round(a.parents.reduce((sum, p) => sum + p.gen, 0) / a.parents.length);
+          const bGen = Math.round(b.parents.reduce((sum, p) => sum + p.gen, 0) / b.parents.length);
+          if (aGen !== bGen) return aGen - bGen;
+          return aCenter - bCenter;
+        })
+        .forEach(item => {
+          const parentGen = Math.round(item.parents.reduce((sum, p) => sum + p.gen, 0) / item.parents.length);
+          familyRows[parentGen] = (familyRows[parentGen] || 0) + 1;
+          item.lane = familyRows[parentGen] - 1;
+        });
+
+      familyItems.forEach(({ fam, parents, children, lane }) => {
         if (parents.length === 0 || children.length === 0) return;
         if (parents.every(p => p.isHidden)) return;
 
-        let pX = parents.reduce((sum, p) => sum + p.x, 0) / parents.length;
-        let pY = parents.reduce((sum, p) => sum + p.y, 0) / parents.length;
-        let pMaxY = Math.max(...parents.map(p => p.y + p.radius));
-        let midY = pMaxY + 35; 
+        const visibleParents = parents.filter(p => !p.isHidden);
+        const visibleChildren = children.filter(c => !c.isHidden);
+        if (visibleParents.length === 0) return;
 
-        let isCollapsed = fam.parentIds.some(pid => collapsedNodes.has(pid));
-        let visibleChildren = children.filter(c => !c.isHidden);
+        const pX = visibleParents.reduce((sum, p) => sum + p.x, 0) / visibleParents.length;
+        const pMaxY = Math.max(...visibleParents.map(p => p.y + p.radius));
+        const parentJointY = pMaxY + 14;
+        let midY = pMaxY + 32 + lane * 18;
+
+        const isCollapsed = fam.parentIds.some(pid => collapsedNodes.has(pid));
+        if (!isCollapsed && visibleChildren.length > 0) {
+          const minChildTop = Math.min(...visibleChildren.map(c => c.y - c.radius));
+          midY = Math.min(midY, minChildTop - 28);
+          midY = Math.max(midY, pMaxY + 20);
+        }
 
         ctx.beginPath();
-        ctx.strokeStyle = '#cbd5e1'; 
+        ctx.strokeStyle = '#cbd5e1';
         ctx.lineWidth = 3;
 
-        let startY = parents.length > 1 ? pY : pY + parents[0].radius;
-        ctx.moveTo(pX, startY);
+        visibleParents.forEach(parent => {
+          const parentBottomY = parent.y + parent.radius;
+          ctx.moveTo(parent.x, parentBottomY);
+          ctx.lineTo(parent.x, parentJointY);
+          if (Math.abs(parent.x - pX) > 1) {
+            ctx.lineTo(pX, parentJointY);
+          }
+        });
+
+        ctx.moveTo(pX, parentJointY);
         ctx.lineTo(pX, midY);
 
         if (!isCollapsed && visibleChildren.length > 0) {
-            let minX = Math.min(pX, ...visibleChildren.map(c => c.x));
-            let maxX = Math.max(pX, ...visibleChildren.map(c => c.x));
-            ctx.moveTo(minX, midY);
-            ctx.lineTo(maxX, midY);
-            visibleChildren.forEach(c => {
-                ctx.moveTo(c.x, midY);
-                ctx.lineTo(c.x, c.y - c.radius);
-            });
+          const sortedChildren = visibleChildren.slice().sort((a, b) => a.x - b.x);
+          const minX = Math.min(pX, sortedChildren[0].x);
+          const maxX = Math.max(pX, sortedChildren[sortedChildren.length - 1].x);
+          ctx.moveTo(minX, midY);
+          ctx.lineTo(maxX, midY);
+
+          sortedChildren.forEach(c => {
+            ctx.moveTo(c.x, midY);
+            ctx.lineTo(c.x, c.y - c.radius);
+          });
         }
         ctx.stroke();
 
