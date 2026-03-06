@@ -1014,8 +1014,9 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
     };
   }, [selectedId, members]);
 
-  const handleMouseDown = (e) => {
-    if (Date.now() < suppressMouseUntilRef.current) return;
+  const handleMouseDown = (e, options = {}) => {
+    const { fromTouch = false } = options;
+    if (!fromTouch && Date.now() < suppressMouseUntilRef.current) return;
 
     // 支援 MouseEvent 或 Touch 傳遞來的物件
     const clientX = e.clientX;
@@ -1108,7 +1109,10 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
     e.preventDefault();
 
     if (e.touches.length === 1) {
-      handleMouseDown({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
+      handleMouseDown(
+        { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY },
+        { fromTouch: true }
+      );
     } else if (e.touches.length === 2) {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
