@@ -132,12 +132,14 @@ const BIAO_SISTER_PATTERNS = new Set([
 ]);
 
 const getCousinTypeByPath = (path) => {
+  if (path.length !== 4) return null;
   const p = path.join(',');
   if (TANG_BROTHER_PATTERNS.has(p) || TANG_SISTER_PATTERNS.has(p)) return 'tang';
   if (BIAO_BROTHER_PATTERNS.has(p) || BIAO_SISTER_PATTERNS.has(p)) return 'biao';
 
-  if (p.includes('F,F,S,') || p.includes('F,M,S,')) return 'tang';
-  if (p.includes('M,F,') || p.includes('M,M,') || p.includes('F,F,D,') || p.includes('F,M,D,')) return 'biao';
+  // Fallback: 父系叔伯的子女 = 堂, 其餘 = 表
+  if (p.startsWith('F,F,S,') || p.startsWith('F,M,S,')) return 'tang';
+  if (p.startsWith('M,F,') || p.startsWith('M,M,') || p.startsWith('F,F,D,') || p.startsWith('F,M,D,')) return 'biao';
   return null;
 };
 
@@ -242,7 +244,7 @@ const resolveAgeAwareKinship = (fromId, toId, members, path) => {
   }
 
   // 堂/表 + 哥弟姊妹
-  if (path.length >= 4 && (path[path.length - 1] === 'S' || path[path.length - 1] === 'D')) {
+  if (path.length === 4 && (path[path.length - 1] === 'S' || path[path.length - 1] === 'D')) {
     const cousinType = getCousinTypeByPath(path);
     if (cousinType) {
       const isOlderThanMe = compareBirthdayOrder(to.birthday, from.birthday);
@@ -252,6 +254,22 @@ const resolveAgeAwareKinship = (fromId, toId, members, path) => {
         return getOlderLabel(isOlderThanMe, `${prefix}哥`, `${prefix}弟`, `${prefix}兄弟`);
       }
       return getOlderLabel(isOlderThanMe, `${prefix}姊`, `${prefix}妹`, `${prefix}姊妹`);
+    }
+  }
+
+  // 堂/表兄弟姊妹的配偶
+  if (path.length === 5 && (path[path.length - 1] === 'W' || path[path.length - 1] === 'H')) {
+    const cousinPath = path.slice(0, 4);
+    const cousinType = getCousinTypeByPath(cousinPath);
+    if (cousinType) {
+      const cousin = (to.spouses || []).map(sid => members[sid]).find(sp => sp && (from.parents || []).some(pid => {
+        // Check if cousin shares ancestor
+        return true; // simplified — fallback to birthday comparison
+      }));
+      const isOlderThanMe = cousin ? compareBirthdayOrder(cousin.birthday, from.birthday) : null;
+      const prefix = cousinType === 'tang' ? '堂' : '表';
+      if (path[path.length - 1] === 'W') return getOlderLabel(isOlderThanMe, `${prefix}嫂`, `${prefix}弟妹`, `${prefix}嫂/弟妹`);
+      if (path[path.length - 1] === 'H') return getOlderLabel(isOlderThanMe, `${prefix}姊夫`, `${prefix}妹夫`, `${prefix}姊夫/妹夫`);
     }
   }
 
@@ -289,13 +307,39 @@ const translatePath = (path, targetGender) => {
     'F,D,S,W': '外甥媳婦', 'F,D,D,H': '外甥女婿', 'M,D,S,W': '外甥媳婦', 'M,D,D,H': '外甥女婿',
     'W,F,S,W': '舅嫂/弟媳', 'W,M,S,W': '舅嫂/弟媳', 'W,F,D,H': '襟兄/襟弟', 'W,M,D,H': '襟兄/襟弟',
     'H,F,S,W': '妯娌', 'H,M,S,W': '妯娌', 'H,F,D,H': '姑爺', 'H,M,D,H': '姑爺',
+    // 小舅子/大舅子的子女
+    'W,F,S,S': '妻舅姪', 'W,M,S,S': '妻舅姪', 'W,F,S,D': '妻舅姪女', 'W,M,S,D': '妻舅姪女',
+    // 小姨子/大姨子的子女
+    'W,F,D,S': '妻姨甥', 'W,M,D,S': '妻姨甥', 'W,F,D,D': '妻姨甥女', 'W,M,D,D': '妻姨甥女',
+    // 大伯/小叔的子女
+    'H,F,S,S': '夫姪', 'H,M,S,S': '夫姪', 'H,F,S,D': '夫姪女', 'H,M,S,D': '夫姪女',
+    // 大姑/小姑的子女
+    'H,F,D,S': '夫甥', 'H,M,D,S': '夫甥', 'H,F,D,D': '夫甥女', 'H,M,D,D': '夫甥女',
   };
   if (map[p]) return map[p];
 
+  // 堂/表兄弟姊妹
   const cousinType = getCousinTypeByPath(path);
   if (cousinType) {
-    if (p.endsWith('S')) return cousinType === 'tang' ? '堂兄弟' : '表兄弟';
-    if (p.endsWith('D')) return cousinType === 'tang' ? '堂姊妹' : '表姊妹';
+    if (p.endsWith(',S')) return cousinType === 'tang' ? '堂兄弟' : '表兄弟';
+    if (p.endsWith(',D')) return cousinType === 'tang' ? '堂姊妹' : '表姊妹';
+    if (p.endsWith(',W')) return cousinType === 'tang' ? '堂嫂/堂弟妹' : '表嫂/表弟妹';
+    if (p.endsWith(',H')) return cousinType === 'tang' ? '堂姊夫/堂妹夫' : '表姊夫/表妹夫';
+  }
+
+  // 堂/表兄弟姊妹的子女 (path like F,F,S,S,S / F,F,S,D,S etc.)
+  if (path.length === 5) {
+    // Check if first 4 steps match a cousin pattern
+    const parentPath = path.slice(0, 4);
+    const parentCousinType = getCousinTypeByPath(parentPath);
+    if (parentCousinType) {
+      const prefix = parentCousinType === 'tang' ? '堂' : '表';
+      const lastStep = path[4];
+      if (lastStep === 'S') return `${prefix}姪子`;
+      if (lastStep === 'D') return `${prefix}姪女`;
+      if (lastStep === 'W') return `${prefix}姪媳婦`;
+      if (lastStep === 'H') return `${prefix}姪女婿`;
+    }
   }
 
   return '親戚';
@@ -307,7 +351,7 @@ const calculateKinship = (fromId, toId, members) => {
   let visited = new Set([fromId]);
   while (queue.length > 0) {
     let { id, path } = queue.shift();
-    if (path.length > 4) continue;
+    if (path.length > 5) continue;
     let current = members[id];
     if (!current) continue;
     if (id === toId) {
