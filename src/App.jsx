@@ -870,7 +870,12 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
 
     sortedGens.forEach(gen => {
       const row = genMap.get(gen);
+      const rowIdSet = new Set(row.map(n => n.id));
       row.sort((a, b) => {
+        const aHasSpouseInRow = a.data.spouses.some(sid => rowIdSet.has(sid));
+        const bHasSpouseInRow = b.data.spouses.some(sid => rowIdSet.has(sid));
+        if (aHasSpouseInRow !== bHasSpouseInRow) return aHasSpouseInRow ? -1 : 1;
+
         const aFamily = a.data.parents.length ? [...a.data.parents].sort().join(',') : a.id;
         const bFamily = b.data.parents.length ? [...b.data.parents].sort().join(',') : b.id;
         if (aFamily !== bFamily) return aFamily.localeCompare(bFamily);
@@ -943,7 +948,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
 
     // Keep spouses adjacent and prevent unrelated relatives from being placed between them.
     const spousePad = 30;
-    for (let pass = 0; pass < 2; pass++) {
+    const enforceSpouseCorridors = () => {
       links.forEach(link => {
         if (link.type !== 'spouse') return;
         const a = link.source;
@@ -967,7 +972,67 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
           }
         });
       });
+    };
+
+    // Priority 1: spouse adjacency
+    for (let pass = 0; pass < 2; pass++) enforceSpouseCorridors();
+
+    // Priority 2: siblings (same parents) stay contiguous without unrelated nodes inserted.
+    const siblingGap = 145;
+    const siblingPad = 24;
+    for (let pass = 0; pass < 2; pass++) {
+      sortedGens.forEach(gen => {
+        const row = (genMap.get(gen) || []).filter(n => !n.isHidden);
+        if (row.length <= 1) return;
+
+        const spouseMemberIds = new Set();
+        links.forEach(link => {
+          if (link.type !== 'spouse') return;
+          if (link.source.gen !== gen || link.target.gen !== gen) return;
+          if (link.source.isHidden || link.target.isHidden) return;
+          spouseMemberIds.add(link.source.id);
+          spouseMemberIds.add(link.target.id);
+        });
+
+        const siblingGroups = new Map();
+        row.forEach(node => {
+          const pids = (node.data.parents || []).slice().sort();
+          if (pids.length === 0) return;
+          const key = pids.join(',');
+          if (!siblingGroups.has(key)) siblingGroups.set(key, []);
+          siblingGroups.get(key).push(node);
+        });
+
+        siblingGroups.forEach(group => {
+          if (group.length < 2) return;
+          const movable = group.filter(n => !spouseMemberIds.has(n.id));
+          if (movable.length < 2) return;
+
+          const centerX = movable.reduce((sum, n) => sum + n.targetX, 0) / movable.length;
+          const left = centerX - ((movable.length - 1) * siblingGap) / 2;
+          movable
+            .slice()
+            .sort((a, b) => a.targetX - b.targetX)
+            .forEach((node, index) => {
+              node.targetX = left + index * siblingGap;
+            });
+
+          const minX = Math.min(...movable.map(n => n.targetX)) - siblingPad;
+          const maxX = Math.max(...movable.map(n => n.targetX)) + siblingPad;
+          row.forEach(node => {
+            if (movable.some(sib => sib.id === node.id)) return;
+            if (node.targetX > minX && node.targetX < maxX) {
+              const toLeft = Math.abs(node.targetX - minX);
+              const toRight = Math.abs(maxX - node.targetX);
+              node.targetX = toLeft < toRight ? minX - 14 : maxX + 14;
+            }
+          });
+        });
+      });
     }
+
+    // Re-apply spouse rule so siblings never break couples.
+    for (let pass = 0; pass < 2; pass++) enforceSpouseCorridors();
 
     // Hidden nodes collapse toward nearest parent to keep transitions smooth.
     nodes.forEach(n => {
