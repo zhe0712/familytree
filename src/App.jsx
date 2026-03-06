@@ -116,8 +116,9 @@ export default function App() {
     if (!q) return [];
     return Object.values(members)
       .filter(m => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q))
+      .map(m => ({ ...m, kinship: calculateKinship(meId, m.id, members) }))
       .slice(0, 8);
-  }, [searchQuery, members]);
+  }, [searchQuery, members, meId]);
 
   useEffect(() => {
     if (!searchHighlightId) return;
@@ -202,13 +203,38 @@ export default function App() {
   // 匯出 JSON (包含族譜名稱與成員資料)
   const handleExportJSON = () => {
     const exportData = { treeName, members };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const jsonText = JSON.stringify(exportData, null, 2);
+    const fileName = `${treeName}.json`;
+    const blob = new Blob([jsonText], { type: 'application/json;charset=utf-8' });
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // Prefer native share sheet on mobile if available.
+    if (navigator.share && typeof File !== 'undefined') {
+      const file = new File([blob], fileName, { type: 'application/json' });
+      navigator.share({ files: [file], title: treeName, text: '族譜資料匯出' }).catch(() => {
+        // User cancelled share or browser rejected; continue with fallback.
+      });
+      return;
+    }
+
+    const blobUrl = URL.createObjectURL(blob);
+
+    // iOS Safari may block/ignore download attribute; open a new tab as fallback.
+    if (isIOS) {
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+      return;
+    }
+
     const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `${treeName}.json`);
+    downloadAnchorNode.setAttribute('href', blobUrl);
+    downloadAnchorNode.setAttribute('download', fileName);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
   };
 
   // 載入 JSON (支援新版含名稱格式，與舊版純成員格式)
@@ -337,8 +363,11 @@ export default function App() {
                         onClick={() => handleSelectFromSearch(m.id)}
                         className="w-full text-left px-3 py-2 hover:bg-emerald-50 flex items-center justify-between"
                       >
-                        <span className="text-sm font-medium text-gray-700">{m.name}</span>
-                        <span className="text-xs text-gray-400">{m.id}</span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-700 truncate">{m.name}</div>
+                          <div className="text-xs text-emerald-600 font-semibold truncate">{m.kinship}</div>
+                        </div>
+                        <span className="text-xs text-gray-400 ml-2">{m.id}</span>
                       </button>
                     ))
                   )}
@@ -484,8 +513,11 @@ export default function App() {
                       onClick={() => handleSelectFromSearch(m.id)}
                       className="w-full text-left px-3 py-3 hover:bg-emerald-50 flex items-center justify-between border-b border-gray-50 last:border-b-0"
                     >
-                      <span className="text-sm font-medium text-gray-700">{m.name}</span>
-                      <span className="text-xs text-gray-400">{m.id}</span>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-700 truncate">{m.name}</div>
+                        <div className="text-xs text-emerald-600 font-semibold truncate">{m.kinship}</div>
+                      </div>
+                      <span className="text-xs text-gray-400 ml-2">{m.id}</span>
                     </button>
                   ))
                 )
