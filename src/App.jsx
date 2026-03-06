@@ -885,7 +885,12 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         return a.id.localeCompare(b.id);
       });
 
-      let cursor = -((row.length - 1) * colSpacing) / 2;
+      // Use current row centroid as anchor instead of hard-centering every row at 0.
+      // This keeps branch positions spreading to both sides like a tree.
+      const rowAnchor = row.length > 0
+        ? row.reduce((sum, n) => sum + (typeof n.targetX === 'number' ? n.targetX : n.x), 0) / row.length
+        : 0;
+      let cursor = rowAnchor - ((row.length - 1) * colSpacing) / 2;
       row.forEach(n => {
         if (typeof n.targetX !== 'number') n.targetX = n.x;
         n.targetX = cursor;
@@ -1035,11 +1040,8 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         unit.nodes[0].targetX = center;
       });
 
-      const placed = row.slice().sort((a, b) => a.targetX - b.targetX);
-      const centerShift = (placed[0].targetX + placed[placed.length - 1].targetX) / 2;
-      placed.forEach(n => {
-        n.targetX -= centerShift;
-      });
+      // Intentionally avoid per-generation hard-centering.
+      // If we center every row, the whole tree collapses toward the middle.
 
       // Keep parent-child vertical links cleaner after packing.
       families.forEach(fam => {
@@ -1052,6 +1054,39 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         const left = parentCenter - ((sortedChildren.length - 1) * siblingGap) / 2;
         sortedChildren.forEach((child, index) => {
           child.targetX = left + index * siblingGap;
+        });
+      });
+
+      // Do not let unrelated nodes be inserted between same-parent siblings.
+      const siblingGroups = new Map();
+      row.forEach(node => {
+        const pids = (node.data.parents || []).slice().sort();
+        if (pids.length === 0) return;
+        const key = pids.join(',');
+        if (!siblingGroups.has(key)) siblingGroups.set(key, []);
+        siblingGroups.get(key).push(node);
+      });
+
+      siblingGroups.forEach(group => {
+        if (group.length < 2) return;
+        const sortedGroup = group.slice().sort((a, b) => a.targetX - b.targetX);
+        const groupIds = new Set(sortedGroup.map(n => n.id));
+        const minX = sortedGroup[0].targetX - 36;
+        const maxX = sortedGroup[sortedGroup.length - 1].targetX + 36;
+        const centerX = (minX + maxX) / 2;
+
+        const outsidersInside = row
+          .filter(n => !groupIds.has(n.id) && n.targetX > minX && n.targetX < maxX)
+          .sort((a, b) => a.targetX - b.targetX);
+
+        const leftSide = outsidersInside.filter(n => n.targetX < centerX).sort((a, b) => b.targetX - a.targetX);
+        const rightSide = outsidersInside.filter(n => n.targetX >= centerX).sort((a, b) => a.targetX - b.targetX);
+
+        leftSide.forEach((node, index) => {
+          node.targetX = minX - 40 - index * 120;
+        });
+        rightSide.forEach((node, index) => {
+          node.targetX = maxX + 40 + index * 120;
         });
       });
     });
