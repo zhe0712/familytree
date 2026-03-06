@@ -858,6 +858,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
     const spouseGap = 130;
 
     const genMap = new Map();
+    const baseRowXById = new Map();
     nodes.forEach(n => {
       n.isHidden = hiddenNodes.has(n.id);
       if (!n.isHidden) {
@@ -888,6 +889,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       let cursor = -((row.length - 1) * colSpacing) / 2;
       row.forEach(n => {
         if (typeof n.targetX !== 'number') n.targetX = n.x;
+        baseRowXById.set(n.id, cursor);
         n.targetX = cursor;
         n.targetY = n.gen * rowSpacing;
         cursor += colSpacing;
@@ -956,19 +958,20 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         if (a.isHidden || b.isHidden) return;
         if (a.gen !== b.gen) return;
 
-        const centerX = (a.targetX + b.targetX) / 2;
-        a.targetX = centerX - spouseGap / 2;
-        b.targetX = centerX + spouseGap / 2;
+        const pairCenterX = (a.targetX + b.targetX) / 2;
+        a.targetX = pairCenterX - spouseGap / 2;
+        b.targetX = pairCenterX + spouseGap / 2;
 
         const minX = Math.min(a.targetX, b.targetX) - spousePad;
         const maxX = Math.max(a.targetX, b.targetX) + spousePad;
+        const corridorCenterX = (minX + maxX) / 2;
 
         (genMap.get(a.gen) || []).forEach(node => {
           if (node.id === a.id || node.id === b.id || node.isHidden) return;
           if (node.targetX > minX && node.targetX < maxX) {
-            const toLeft = Math.abs(node.targetX - minX);
-            const toRight = Math.abs(maxX - node.targetX);
-            node.targetX = toLeft < toRight ? minX - 14 : maxX + 14;
+            const baseX = baseRowXById.get(node.id) ?? node.targetX;
+            const shouldGoLeft = baseX < corridorCenterX || (baseX === corridorCenterX && node.id < a.id);
+            node.targetX = shouldGoLeft ? minX - 14 : maxX + 14;
           }
         });
       });
@@ -1008,8 +1011,8 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
           const movable = group.filter(n => !spouseMemberIds.has(n.id));
           if (movable.length < 2) return;
 
-          const centerX = movable.reduce((sum, n) => sum + n.targetX, 0) / movable.length;
-          const left = centerX - ((movable.length - 1) * siblingGap) / 2;
+          const groupCenterX = movable.reduce((sum, n) => sum + n.targetX, 0) / movable.length;
+          const left = groupCenterX - ((movable.length - 1) * siblingGap) / 2;
           movable
             .slice()
             .sort((a, b) => a.targetX - b.targetX)
@@ -1019,12 +1022,13 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
 
           const minX = Math.min(...movable.map(n => n.targetX)) - siblingPad;
           const maxX = Math.max(...movable.map(n => n.targetX)) + siblingPad;
+          const siblingCorridorCenterX = (minX + maxX) / 2;
           row.forEach(node => {
             if (movable.some(sib => sib.id === node.id)) return;
             if (node.targetX > minX && node.targetX < maxX) {
-              const toLeft = Math.abs(node.targetX - minX);
-              const toRight = Math.abs(maxX - node.targetX);
-              node.targetX = toLeft < toRight ? minX - 14 : maxX + 14;
+              const baseX = baseRowXById.get(node.id) ?? node.targetX;
+              const shouldGoLeft = baseX < siblingCorridorCenterX || (baseX === siblingCorridorCenterX && node.id < movable[0].id);
+              node.targetX = shouldGoLeft ? minX - 14 : maxX + 14;
             }
           });
         });
