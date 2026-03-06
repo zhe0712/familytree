@@ -378,6 +378,8 @@ const calculateKinship = (fromId, toId, members) => {
 // ==========================================
 export default function App() {
   const [treeName, setTreeName] = useState('王家大族譜'); // 新增：族譜名稱狀態
+  const [editingTreeName, setEditingTreeName] = useState(false);
+  const [treeNameDraft, setTreeNameDraft] = useState('');
   const [members, setMembers] = useState(() => normalizeMembers(INITIAL_MEMBERS));
   const [meId, setMeId] = useState('m3');
   const [selectedId, setSelectedId] = useState(null);
@@ -675,9 +677,25 @@ export default function App() {
                 <Share2 size={18} className="md:w-6 md:h-6" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-base md:text-xl font-bold text-gray-800 tracking-wide truncate">
-                  {treeName}
-                </h1>
+                {editingTreeName ? (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={treeNameDraft}
+                    onChange={e => setTreeNameDraft(e.target.value)}
+                    onBlur={() => { if (treeNameDraft.trim()) setTreeName(treeNameDraft.trim()); setEditingTreeName(false); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { if (treeNameDraft.trim()) setTreeName(treeNameDraft.trim()); setEditingTreeName(false); } if (e.key === 'Escape') setEditingTreeName(false); }}
+                    className="text-base md:text-xl font-bold text-gray-800 tracking-wide bg-white border border-emerald-400 rounded-lg px-2 py-0.5 outline-none focus:ring-2 focus:ring-emerald-500 w-full"
+                  />
+                ) : (
+                  <h1
+                    className="text-base md:text-xl font-bold text-gray-800 tracking-wide truncate cursor-pointer hover:text-emerald-600 transition"
+                    onClick={() => { setTreeNameDraft(treeName); setEditingTreeName(true); }}
+                    title="點擊修改族譜名稱"
+                  >
+                    {treeName}
+                  </h1>
+                )}
                 <div className="text-[11px] md:text-xs text-gray-500 flex items-center gap-1 font-medium mt-0.5 md:mt-1">
                   <span>視角: </span>
                   <select 
@@ -2179,15 +2197,28 @@ const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRel
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
-          <div className="mb-3">
-            <label className="block text-xs font-bold text-gray-500 mb-1">忌日</label>
-            <input
-              type="date"
-              value={member.deathDate || ''}
-              onChange={(e) => onUpdateMember(member.id, { deathDate: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
+          {member.deathDate ? (
+            <div className="mb-3">
+              <label className="block text-xs font-bold text-gray-500 mb-1">忌日</label>
+              <input
+                type="date"
+                value={member.deathDate || ''}
+                onChange={(e) => onUpdateMember(member.id, { deathDate: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                onClick={() => onUpdateMember(member.id, { deathDate: '' })}
+                className="mt-1 text-[11px] text-gray-400 hover:text-red-400 transition"
+              >移除忌日</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onUpdateMember(member.id, { deathDate: ' ' })}
+              className="mb-3 text-xs text-gray-400 hover:text-gray-600 transition flex items-center gap-1"
+            >
+              <span className="text-base leading-none">＋</span> 新增忌日
+            </button>
+          )}
           <p className="text-gray-700 leading-relaxed text-sm">
             {member.bio || '尚未留下個人簡介。'}
           </p>
@@ -2304,6 +2335,9 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
     relativeId: context?.relativeId || Object.keys(members)[0],
     relationText: ''
   });
+
+  const [showDeathDateForm, setShowDeathDateForm] = useState(false);
+  const [showDeathDateText, setShowDeathDateText] = useState(false);
 
     const linkNodes = (draft, id1, id2, relType) => {
       const addUnique = (arr, value) => {
@@ -2480,10 +2514,14 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
                         <label className="block text-xs text-gray-500 mb-1">生日</label>
                         <input type="date" value={textData.birthday} onChange={e => setTextData({...textData, birthday: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" />
                       </div>
-                      <div className="flex-1">
-                        <label className="block text-xs text-gray-500 mb-1">忌日</label>
-                        <input type="date" value={textData.deathDate} onChange={e => setTextData({...textData, deathDate: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" />
-                      </div>
+                      {showDeathDateText ? (
+                        <div className="flex-1">
+                          <label className="block text-xs text-gray-500 mb-1">忌日</label>
+                          <input type="date" value={textData.deathDate} onChange={e => setTextData({...textData, deathDate: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => setShowDeathDateText(true)} className="self-end mb-1 text-xs text-gray-400 hover:text-gray-600 transition whitespace-nowrap">＋ 忌日</button>
+                      )}
                     </div>
                      <div className="flex gap-4">
                        <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${textData.gender === 'M' ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="M" className="hidden" onChange={() => setTextData({...textData, gender: 'M'})} /> ♂ 男性</label>
@@ -2514,10 +2552,14 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
                         <label className="block text-xs text-gray-500 mb-1">生日</label>
                         <input type="date" value={formData.birthday} onChange={e => setFormData({...formData, birthday: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" />
                       </div>
-                      <div className="flex-1">
-                        <label className="block text-xs text-gray-500 mb-1">忌日</label>
-                        <input type="date" value={formData.deathDate} onChange={e => setFormData({...formData, deathDate: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" />
-                      </div>
+                      {showDeathDateForm ? (
+                        <div className="flex-1">
+                          <label className="block text-xs text-gray-500 mb-1">忌日</label>
+                          <input type="date" value={formData.deathDate} onChange={e => setFormData({...formData, deathDate: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => setShowDeathDateForm(true)} className="self-end mb-1 text-xs text-gray-400 hover:text-gray-600 transition whitespace-nowrap">＋ 忌日</button>
+                      )}
                     </div>
                      <div className="flex gap-4">
                        <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${formData.gender === 'M' ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="M" className="hidden" onChange={() => setFormData({...formData, gender: 'M'})} /> ♂ 男性</label>
