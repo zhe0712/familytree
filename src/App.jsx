@@ -1080,7 +1080,7 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
   const computeLayoutTargets = useCallback((engine, hiddenNodes) => {
     const { nodes, links, families } = engine;
     const rowSpacing = 230;
-    const unitGap = 160;    // gap between sibling units (child+spouse)
+    const unitGap = 200;    // gap between sibling units (child+spouse)
     const spouseGap = 130;  // gap between spouses within a couple
 
     // --- Mark hidden ---
@@ -1179,9 +1179,18 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
       myChildren.forEach((cid, i) => {
         const cSpouses = getSpouses(cid);
         const childSubtreeW = calcWidth(cid, visited);
+        // Also account for spouses' subtree widths
+        // When a child is positioned, their spouses are placed alongside and may bring their own descendants
+        let spouseExtraW = 0;
+        cSpouses.forEach(sp => {
+          const spW = calcWidth(sp.id, visited);
+          if (spW > spouseGap) {
+            spouseExtraW += (spW - spouseGap); // extra width beyond the spouse node itself
+          }
+        });
         // Each child unit includes the child + their spouses
         const childUnitOwnW = cSpouses.length > 0 ? spouseGap * cSpouses.length : 0;
-        const childW = Math.max(childSubtreeW, childUnitOwnW, spouseGap);
+        const childW = Math.max(childSubtreeW + spouseExtraW, childUnitOwnW, spouseGap);
         childrenTotalWidth += childW;
         if (i > 0) childrenTotalWidth += unitGap - spouseGap; // gap between child units
       });
@@ -1217,39 +1226,85 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
       n.targetX = centerX;
       n.targetY = gen * rowSpacing;
 
-      // Place spouses
+      // Place spouses (track which ones are newly positioned in this call)
       const spouses = getSpouses(id);
-      spouses.forEach((sp, i) => {
+      const newlyPositionedSpouseIds = [];
+      spouses.forEach((sp) => {
         if (positioned.has(sp.id)) return;
         positioned.add(sp.id);
-        sp.targetX = centerX + spouseGap * (i + 1);
+        newlyPositionedSpouseIds.push(sp.id);
         sp.targetY = gen * rowSpacing;
       });
 
-      // Adjust: center the couple
-      if (spouses.length > 0) {
-        const coupleWidth = spouseGap * spouses.length;
-        const coupleLeft = centerX - coupleWidth / 2;
-        n.targetX = coupleLeft;
-        spouses.forEach((sp, i) => {
-          sp.targetX = coupleLeft + spouseGap * (i + 1);
-        });
+      // Determine left-right ordering for the couple
+      // If the main node (id) has parents already positioned, it should be on the side closer to its parents
+      // If a spouse has parents already positioned, it should be on the side closer to its parents
+      // Default: blood member left, spouse(s) right
+      if (newlyPositionedSpouseIds.length > 0) {
+        const allInCouple = [id, ...newlyPositionedSpouseIds];
+        
+        // Check who has parents positioned and where
+        const getParentPull = (mid) => {
+          const mn = nodeById[mid];
+          if (!mn) return null;
+          const posParents = (mn.data.parents || []).filter(pid => positioned.has(pid) && nodeById[pid]);
+          if (posParents.length === 0) return null;
+          const avgX = posParents.reduce((s, pid) => s + nodeById[pid].targetX, 0) / posParents.length;
+          return avgX;
+        };
+
+        // Sort: member whose parents are more to the left goes on the left
+        const pullMain = getParentPull(id);
+        const pullSpouse = newlyPositionedSpouseIds.length === 1 ? getParentPull(newlyPositionedSpouseIds[0]) : null;
+
+        let shouldFlip = false;
+        if (pullMain !== null && pullSpouse !== null) {
+          // Both have parents: left-parent person goes left
+          shouldFlip = pullSpouse < pullMain;
+        } else if (pullSpouse !== null && pullMain === null) {
+          // Only spouse has parents — check if spouse's parent pull is to the left
+          shouldFlip = pullSpouse < centerX;
+        }
+        // If only main has parents or neither has: keep default (main left)
+
+        if (shouldFlip && newlyPositionedSpouseIds.length === 1) {
+          // Swap: spouse goes left, main goes right
+          const coupleWidth = spouseGap;
+          const coupleLeft = centerX - coupleWidth / 2;
+          const sp = nodeById[newlyPositionedSpouseIds[0]];
+          sp.targetX = coupleLeft;
+          n.targetX = coupleLeft + spouseGap;
+        } else {
+          // Default: main left, spouses right
+          const coupleWidth = spouseGap * newlyPositionedSpouseIds.length;
+          const coupleLeft = centerX - coupleWidth / 2;
+          n.targetX = coupleLeft;
+          newlyPositionedSpouseIds.forEach((spId, i) => {
+            nodeById[spId].targetX = coupleLeft + spouseGap * (i + 1);
+          });
+        }
       }
 
-      // Position children
+      // Position children — include children from this node AND newly-positioned spouses
+      // This handles the case where the spouse is the "primaryParent" but was placed as part of this couple
+      const coupleIds = [id, ...newlyPositionedSpouseIds];
       const childIds = [];
       const seen = new Set();
-      (n.data.children || []).forEach(cid => {
-        if (!seen.has(cid) && nodeById[cid] && !nodeById[cid].isHidden && !positioned.has(cid)) {
-          // Only if this node is primary parent
-          const c = nodeById[cid];
-          const bloodParents = c.data.parents.filter(pid => nodeById[pid] && !nodeById[pid].isHidden && nodeById[pid].data.parents.length > 0);
-          const primaryParent = bloodParents.length > 0 ? bloodParents[0] : c.data.parents[0];
-          if (primaryParent === id) {
-            seen.add(cid);
-            childIds.push(cid);
+      coupleIds.forEach(pid => {
+        const pn = nodeById[pid];
+        if (!pn) return;
+        (pn.data.children || []).forEach(cid => {
+          if (!seen.has(cid) && nodeById[cid] && !nodeById[cid].isHidden && !positioned.has(cid)) {
+            // Check primaryParent is part of this couple
+            const c = nodeById[cid];
+            const bloodParents = c.data.parents.filter(ppid => nodeById[ppid] && !nodeById[ppid].isHidden && nodeById[ppid].data.parents.length > 0);
+            const primaryParent = bloodParents.length > 0 ? bloodParents[0] : c.data.parents[0];
+            if (coupleIds.includes(primaryParent)) {
+              seen.add(cid);
+              childIds.push(cid);
+            }
           }
-        }
+        });
       });
 
       if (childIds.length === 0) return;
@@ -1264,10 +1319,9 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
 
       const totalChildrenWidth = childWidths.reduce((s, w) => s + w, 0) + (childIds.length - 1) * (unitGap - spouseGap);
 
-      // Center the couple pair
-      const coupleCenterX = spouses.length > 0
-        ? (n.targetX + spouses[spouses.length - 1].targetX) / 2
-        : centerX;
+      // Center the couple pair using actual positioned coordinates
+      const allCoupleXs = [n.targetX, ...newlyPositionedSpouseIds.map(sid => nodeById[sid].targetX)];
+      const coupleCenterX = (Math.min(...allCoupleXs) + Math.max(...allCoupleXs)) / 2;
 
       let childCursor = coupleCenterX - totalChildrenWidth / 2;
 
@@ -1283,7 +1337,23 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
     if (sortedGens.length > 0) {
       const rootGen = sortedGens[0];
       const rootRow = genMap.get(rootGen) || [];
-      const bloodRoots = rootRow.filter(n => isBlood(n) && !positioned.has(n.id));
+      let bloodRoots = rootRow.filter(n => isBlood(n) && !positioned.has(n.id));
+
+      // Deduplicate: if both spouses are bloodRoots, keep only the one with larger subtree width
+      // This prevents the wrong spouse from being positioned first (claiming 0 children)
+      const deduped = new Set();
+      bloodRoots = bloodRoots.filter(n => {
+        if (deduped.has(n.id)) return false;
+        const spouseRoots = (n.data.spouses || []).filter(sid => bloodRoots.some(br => br.id === sid));
+        if (spouseRoots.length > 0) {
+          // Keep the one with largest unitWidth, mark others as handled
+          const allInCouple = [n.id, ...spouseRoots];
+          const best = allInCouple.reduce((a, b) => (unitWidth[a] || 0) >= (unitWidth[b] || 0) ? a : b);
+          allInCouple.forEach(cid => { if (cid !== best) deduped.add(cid); });
+          return n.id === best;
+        }
+        return true;
+      });
 
       // Calculate total width of all root subtrees
       const rootWidths = bloodRoots.map(n => unitWidth[n.id] || spouseGap);
@@ -1331,14 +1401,111 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
     let secondaryCursor = maxPositionedX + unitGap * 1.5;
     parentFamilies.forEach(fam => {
       const mems = fam.members;
-      const cx = secondaryCursor;
+
+      // Collect remaining unpositioned children from all family members
+      const unposChildIds = [];
+      const seenC = new Set();
+      mems.forEach(mid => {
+        (nodeById[mid].data.children || []).forEach(cid => {
+          if (!seenC.has(cid) && !positioned.has(cid) && nodeById[cid] && !nodeById[cid].isHidden) {
+            seenC.add(cid);
+            unposChildIds.push(cid);
+          }
+        });
+      });
+
+      // Position remaining children next to already-positioned siblings
+      if (unposChildIds.length > 0) {
+        unposChildIds.forEach(cid => { if (!unitWidth[cid]) calcWidth(cid, new Set()); });
+        const childWidths = unposChildIds.map(cid => {
+          const cSp = getSpouses(cid);
+          const subtreeW = unitWidth[cid] || spouseGap;
+          const ownW = cSp.length > 0 ? spouseGap * cSp.length : 0;
+          return Math.max(subtreeW, ownW, spouseGap);
+        });
+        const posChildIds = [...new Set(mems.flatMap(mid =>
+          (nodeById[mid].data.children || []).filter(cid => positioned.has(cid) && nodeById[cid] && !nodeById[cid].isHidden)
+        ))];
+        const childGen = nodeById[unposChildIds[0]].gen;
+        // BUG FIX: Find rightmost positioned node on the ENTIRE target generation,
+        // not just among siblings, to avoid overlapping with other family branches.
+        const genRowForChild = (genMap.get(childGen) || []).filter(n => !n.isHidden && positioned.has(n.id));
+        const genRightmostX = genRowForChild.length > 0
+          ? Math.max(...genRowForChild.map(n => n.targetX))
+          : -Infinity;
+        let childCursor;
+        if (posChildIds.length > 0) {
+          const siblingRightmost = Math.max(...posChildIds.map(cid => {
+            const cn = nodeById[cid];
+            const cnSp = getSpouses(cid).filter(sp => positioned.has(sp.id));
+            return cnSp.length > 0 ? Math.max(cn.targetX, ...cnSp.map(sp => sp.targetX)) : cn.targetX;
+          }));
+          childCursor = Math.max(siblingRightmost, genRightmostX) + unitGap;
+        } else {
+          childCursor = Math.max(secondaryCursor, isFinite(genRightmostX) ? genRightmostX + unitGap : secondaryCursor);
+        }
+        unposChildIds.forEach((cid, i) => {
+          const w = childWidths[i];
+          positionSubtree(cid, childCursor + w / 2, childGen);
+          childCursor += w + (unitGap - spouseGap);
+        });
+        secondaryCursor = Math.max(secondaryCursor, childCursor + unitGap);
+      }
+
+      // Place parents centered above ALL their children
+      const allChildXs = [];
+      const seenAll = new Set();
+      mems.forEach(mid => {
+        (nodeById[mid].data.children || []).forEach(cid => {
+          if (!seenAll.has(cid) && positioned.has(cid) && nodeById[cid] && !nodeById[cid].isHidden) {
+            seenAll.add(cid);
+            allChildXs.push(nodeById[cid].targetX);
+            getSpouses(cid).filter(sp => positioned.has(sp.id)).forEach(sp => allChildXs.push(sp.targetX));
+          }
+        });
+      });
+      const parentCenterX = allChildXs.length > 0
+        ? (Math.min(...allChildXs) + Math.max(...allChildXs)) / 2
+        : secondaryCursor;
+
+      // BUG FIX: Check for collisions with existing positioned nodes on the parent generation
+      // and shift parents to the right if needed.
+      const parentGen = nodeById[mems[0]].gen;
+      const parentGenExisting = (genMap.get(parentGen) || []).filter(n => !n.isHidden && positioned.has(n.id));
+      let adjustedParentCenterX = parentCenterX;
+      if (parentGenExisting.length > 0) {
+        const halfSpan = ((mems.length - 1) * spouseGap) / 2;
+        let plannedLeft = adjustedParentCenterX - halfSpan;
+        let plannedRight = adjustedParentCenterX + halfSpan;
+        // Find any existing node that would overlap with our planned positions
+        let needShift = true;
+        while (needShift) {
+          needShift = false;
+          for (const existingNode of parentGenExisting) {
+            const ex = existingNode.targetX;
+            // Check if existing node is within the planned range (with minGap buffer)
+            if (ex >= plannedLeft - unitGap && ex <= plannedRight + unitGap) {
+              // Shift parents to the right of the existing node
+              const newLeft = ex + unitGap;
+              const shift = newLeft - plannedLeft;
+              if (shift > 0) {
+                adjustedParentCenterX += shift;
+                plannedLeft += shift;
+                plannedRight += shift;
+                needShift = true; // re-check after shifting
+              }
+            }
+          }
+        }
+      }
+
       mems.forEach((mid, i) => {
         const mn = nodeById[mid];
         positioned.add(mid);
-        mn.targetX = cx + i * spouseGap - ((mems.length - 1) * spouseGap) / 2;
+        mn.targetX = adjustedParentCenterX + i * spouseGap - ((mems.length - 1) * spouseGap) / 2;
         mn.targetY = mn.gen * rowSpacing;
       });
-      secondaryCursor += mems.length * spouseGap + unitGap;
+      secondaryCursor = Math.max(secondaryCursor, adjustedParentCenterX + mems.length * spouseGap + unitGap);
     });
 
     // Phase B: unpositioned spouses of positioned nodes → snap next to spouse
@@ -1362,37 +1529,54 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
       positioned.add(n.id);
     });
 
-    // --- Final overlap fix (light pass, never splits couples) ---
+    // --- Final overlap fix (push overlapping nodes apart, keeping couples together) ---
     sortedGens.forEach(gen => {
       const row = (genMap.get(gen) || []).filter(n => !n.isHidden).sort((a, b) => a.targetX - b.targetX);
-      for (let pass = 0; pass < 5; pass++) {
-        for (let i = 1; i < row.length; i++) {
-          const prev = row[i - 1], curr = row[i];
-          const isCouple = prev.data.spouses.includes(curr.id) || curr.data.spouses.includes(prev.id);
-          const minGap = isCouple ? 120 : 145;
-          const gap = curr.targetX - prev.targetX;
-          if (gap < minGap) {
-            // If one of them is part of a couple with its neighbour, push the outsider away
-            const fix = minGap - gap;
-            if (isCouple) {
-              // Couple too close — symmetric push
-              prev.targetX -= fix / 2;
-              curr.targetX += fix / 2;
-            } else {
-              // Non-couple overlap — push the one that is further from a coupled partner outward
-              const prevIsCoupled = i >= 2 && (row[i - 2].data.spouses.includes(prev.id) || prev.data.spouses.includes(row[i - 2].id));
-              const currIsCoupled = i + 1 < row.length && (curr.data.spouses.includes(row[i + 1].id) || row[i + 1].data.spouses.includes(curr.id));
-              if (prevIsCoupled && !currIsCoupled) {
-                curr.targetX += fix;
-              } else if (!prevIsCoupled && currIsCoupled) {
-                prev.targetX -= fix;
-              } else {
-                prev.targetX -= fix / 2;
-                curr.targetX += fix / 2;
-              }
-            }
+      if (row.length < 2) return;
+
+      // Group nodes into "blocks" (couples stay together as one block)
+      const blocks = [];
+      let i = 0;
+      while (i < row.length) {
+        const block = [row[i]];
+        // Absorb consecutive coupled nodes into the same block
+        while (i + 1 < row.length && (row[i].data.spouses.includes(row[i + 1].id) || row[i + 1].data.spouses.includes(row[i].id))) {
+          i++;
+          block.push(row[i]);
+        }
+        blocks.push(block);
+        i++;
+      }
+
+      // Ensure minimum spacing within each block (couple gap)
+      blocks.forEach(block => {
+        for (let j = 1; j < block.length; j++) {
+          const minCoupleGap = 125;
+          const gap = block[j].targetX - block[j - 1].targetX;
+          if (gap < minCoupleGap) {
+            block[j].targetX = block[j - 1].targetX + minCoupleGap;
           }
         }
+      });
+
+      // Push blocks apart (left-to-right sweep, up to 20 passes)
+      for (let pass = 0; pass < 20; pass++) {
+        let anyFix = false;
+        for (let bi = 1; bi < blocks.length; bi++) {
+          const prevBlock = blocks[bi - 1];
+          const currBlock = blocks[bi];
+          const prevRight = prevBlock[prevBlock.length - 1].targetX;
+          const currLeft = currBlock[0].targetX;
+          const minGap = 160;
+          const gap = currLeft - prevRight;
+          if (gap < minGap) {
+            const fix = minGap - gap;
+            anyFix = true;
+            // Push current block (and all subsequent blocks) to the right
+            currBlock.forEach(n => { n.targetX += fix; });
+          }
+        }
+        if (!anyFix) break;
       }
     });
 
