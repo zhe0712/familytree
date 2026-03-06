@@ -2453,10 +2453,32 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
               else if (['媽媽', '母親', '媽', '婆婆', '岳母'].includes(step)) { relType = 'parent'; gender = 'F'; }
               else if (['兒子', '子', '男'].includes(step)) { relType = 'child'; gender = 'M'; }
               else if (['女兒', '女'].includes(step)) { relType = 'child'; gender = 'F'; }
+              else if (['小孩', '孩子'].includes(step)) { relType = 'child'; gender = textData.gender; }
               else if (['老公', '丈夫', '夫', '配偶'].includes(step)) { relType = 'spouse'; gender = 'M'; }
               else if (['老婆', '妻子', '妻'].includes(step)) { relType = 'spouse'; gender = 'F'; }
               else if (['哥哥', '弟弟', '兄', '弟'].includes(step)) { relType = 'sibling'; gender = 'M'; }
               else if (['姊姊', '妹妹', '姊', '姐', '妹'].includes(step)) { relType = 'sibling'; gender = 'F'; }
+              // 複合親屬：自動展開為多步驟
+              else if (['叔叔', '伯伯', '叔', '伯'].includes(step)) { steps.splice(i, 1, '爸爸', '兄弟'); i--; continue; }
+              else if (['姑姑', '姑', '姑媽'].includes(step)) { steps.splice(i, 1, '爸爸', '姊妹'); i--; continue; }
+              else if (['舅舅', '舅'].includes(step)) { steps.splice(i, 1, '媽媽', '兄弟'); i--; continue; }
+              else if (['阿姨', '姨', '姨媽'].includes(step)) { steps.splice(i, 1, '媽媽', '姊妹'); i--; continue; }
+              else if (['爺爺', '祖父', '阿公'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸'); i--; continue; }
+              else if (['奶奶', '祖母', '阿嬤', '阿罵', '阿婆'].includes(step)) { steps.splice(i, 1, '爸爸', '媽媽'); i--; continue; }
+              else if (['外公', '外祖父'].includes(step)) { steps.splice(i, 1, '媽媽', '爸爸'); i--; continue; }
+              else if (['外婆', '外祖母'].includes(step)) { steps.splice(i, 1, '媽媽', '媽媽'); i--; continue; }
+              else if (['阿祖', '曾祖父'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸', '爸爸'); i--; continue; }
+              else if (['曾祖母'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸', '媽媽'); i--; continue; }
+              else if (['阿泰', '高祖父'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸', '爸爸', '爸爸'); i--; continue; }
+              else if (['高祖母'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸', '爸爸', '媽媽'); i--; continue; }
+              else if (['孫子'].includes(step)) { steps.splice(i, 1, '兒子', '兒子'); i--; continue; }
+              else if (['孫女'].includes(step)) { steps.splice(i, 1, '兒子', '女兒'); i--; continue; }
+              else if (['外孫'].includes(step)) { steps.splice(i, 1, '女兒', '兒子'); i--; continue; }
+              else if (['外孫女'].includes(step)) { steps.splice(i, 1, '女兒', '女兒'); i--; continue; }
+              else if (['堂哥', '堂弟', '堂兄'].includes(step)) { steps.splice(i, 1, '爸爸', '兄弟', '兒子'); i--; continue; }
+              else if (['堂姊', '堂妹', '堂姐'].includes(step)) { steps.splice(i, 1, '爸爸', '兄弟', '女兒'); i--; continue; }
+              else if (['表哥', '表弟', '表兄'].includes(step)) { steps.splice(i, 1, '媽媽', '兄弟', '兒子'); i--; continue; }
+              else if (['表姊', '表妹', '表姐'].includes(step)) { steps.splice(i, 1, '媽媽', '兄弟', '女兒'); i--; continue; }
               else { setErrorMsg(`無法識別關鍵字: "${step}"`); return; }
 
               if (isLast) {
