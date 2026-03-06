@@ -96,6 +96,10 @@ export default function App() {
   const [meId, setMeId] = useState('m3');
   const [selectedId, setSelectedId] = useState(null);
   const [isStartOpen, setIsStartOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchFocusId, setSearchFocusId] = useState(null);
+  const [searchHighlightId, setSearchHighlightId] = useState(null);
   
   const [isQAOpen, setIsQAOpen] = useState(false);
   const [qaContext, setQaContext] = useState(null); 
@@ -104,6 +108,19 @@ export default function App() {
   const fileInputRef = useRef(null);
 
   const selectedMember = selectedId ? members[selectedId] : null;
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return Object.values(members)
+      .filter(m => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [searchQuery, members]);
+
+  useEffect(() => {
+    if (!searchHighlightId) return;
+    const timer = setTimeout(() => setSearchHighlightId(null), 4000);
+    return () => clearTimeout(timer);
+  }, [searchHighlightId]);
 
   const handleUpdateMembers = (newMembersMap, targetId) => {
     setMembers(newMembersMap);
@@ -161,6 +178,15 @@ export default function App() {
     setMembers({ ...members, [selectedId]: { ...members[selectedId], posts: [newPost, ...members[selectedId].posts] } });
   };
 
+  const handleSelectFromSearch = (id) => {
+    if (!members[id]) return;
+    setSelectedId(id);
+    setSearchFocusId(id);
+    setSearchHighlightId(id);
+    setSearchQuery(members[id].name);
+    setIsSearchOpen(false);
+  };
+
   // 匯出 JSON (包含族譜名稱與成員資料)
   const handleExportJSON = () => {
     const exportData = { treeName, members };
@@ -206,6 +232,8 @@ export default function App() {
           selectedId={selectedId}
           onSelect={setSelectedId}
           meId={meId}
+          focusId={searchFocusId}
+          searchHighlightId={searchHighlightId}
         />
         
         {/* 手機版與桌面版相容的頂部控制列 */}
@@ -250,6 +278,54 @@ export default function App() {
               <button onClick={() => setIsResetOpen(true)} className="hover:text-red-500 text-red-400 flex items-center gap-1 transition p-1 bg-gray-50/50 rounded">
                 <RefreshCcw size={14}/> <span className="hidden sm:inline">重新開始</span>
               </button>
+            </div>
+
+            <div className="relative mt-1">
+              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
+                <Search size={15} className="text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setIsSearchOpen(true);
+                  }}
+                  onFocus={() => setIsSearchOpen(true)}
+                  onBlur={() => setTimeout(() => setIsSearchOpen(false), 120)}
+                  placeholder="搜尋姓名或 ID..."
+                  className="w-full bg-transparent outline-none text-sm text-gray-700"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setIsSearchOpen(false);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {isSearchOpen && searchQuery.trim() && (
+                <div className="absolute mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                  {searchResults.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-400">找不到符合的人物</div>
+                  ) : (
+                    searchResults.map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => handleSelectFromSearch(m.id)}
+                        className="w-full text-left px-3 py-2 hover:bg-emerald-50 flex items-center justify-between"
+                      >
+                        <span className="text-sm font-medium text-gray-700">{m.name}</span>
+                        <span className="text-xs text-gray-400">{m.id}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -349,7 +425,7 @@ export default function App() {
 // ==========================================
 // 4. Canvas 互動族譜樹核心組件 (重寫版平滑物理引擎)
 // ==========================================
-const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
+const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighlightId }) => {
   const canvasRef = useRef(null);
   
   const engineRef = useRef({
@@ -607,6 +683,19 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
   }, [members, meId]);
 
   useEffect(() => {
+    if (!focusId) return;
+    const engine = engineRef.current;
+    const node = engine.nodes.find(n => n.id === focusId);
+    const canvas = canvasRef.current;
+    if (!node || !canvas) return;
+
+    const targetScale = Math.max(0.75, engine.transform.scale);
+    engine.transform.scale = targetScale;
+    engine.transform.x = canvas.width / 2 - node.x * targetScale;
+    engine.transform.y = canvas.height / 2 - node.y * targetScale;
+  }, [focusId, members]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     let animationFrameId;
@@ -836,10 +925,23 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
         ctx.globalAlpha = n.isHidden ? 0 : 1;
         const isSelected = n.id === selectedId;
         const isViewpoint = n.isViewpoint;
+        const isSearchHit = n.id === searchHighlightId;
 
         ctx.shadowColor = 'rgba(0,0,0,0.15)';
         ctx.shadowBlur = 15;
         ctx.shadowOffsetY = 8;
+
+        if (isSearchHit && !n.isHidden) {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.radius + 18, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.radius + 15, 0, Math.PI * 2);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = '#f59e0b';
+          ctx.stroke();
+        }
 
         if (isViewpoint && !n.isHidden) {
           ctx.beginPath();
