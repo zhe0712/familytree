@@ -3,7 +3,7 @@ import {
   UserPlus, Info, Share2, QrCode, X, Search, 
   ZoomIn, ZoomOut, Maximize, UserCircle, ChevronRight, 
   ChevronDown, MessageSquare, MapPin, Heart, Edit3, Type, List,
-  Download, Upload,
+  Download, Upload, Settings,
   RefreshCcw, Edit2
 } from 'lucide-react';
 
@@ -23,8 +23,14 @@ const INITIAL_MEMBERS = {
   'g2_f2': { id: 'g2_f2', name: '周惠', gender: 'F', birthday: '1974-04-12', parents: [], children: ['g3_m3'], spouses: ['g2_m2'], bio: '賢內助，廚藝極佳。', posts: [], claimed: false },
   'm3': { id: 'm3', name: '王建國', gender: 'M', birthday: '1993-05-09', parents: ['m1', 'm2'], children: ['m5', 'g4_f1'], spouses: ['m6'], bio: '長子，目前在科技業擔任工程師。', posts: [], claimed: true },
   'm6': { id: 'm6', name: '陳淑芬', gender: 'F', birthday: '1994-09-21', parents: ['yf_m', 'yf_f'], children: ['m5', 'g4_f1'], spouses: ['m3'], bio: '溫柔體貼，喜歡烹飪。', posts: [], claimed: false },
-  'yf_m': { id: 'yf_m', name: '陳志明', gender: 'M', birthday: '1965-02-28', parents: [], children: ['m6'], spouses: ['yf_f'], bio: '經營小吃店，熱情豪爽。', posts: [], claimed: false },
-  'yf_f': { id: 'yf_f', name: '黃麗華', gender: 'F', birthday: '1967-07-14', parents: [], children: ['m6'], spouses: ['yf_m'], bio: '社區志工，樂於助人。', posts: [], claimed: false },
+  'yf_m': { id: 'yf_m', name: '陳志明', gender: 'M', birthday: '1965-02-28', parents: [], children: ['m6', 'xjz', 'xyz'], spouses: ['yf_f'], bio: '經營小吃店，熱情豪爽。', posts: [], claimed: false },
+  'yf_f': { id: 'yf_f', name: '黃麗華', gender: 'F', birthday: '1967-07-14', parents: [], children: ['m6', 'xjz', 'xyz'], spouses: ['yf_m'], bio: '社區志工，樂於助人。', posts: [], claimed: false },
+  'xjz': { id: 'xjz', name: '陳柏翰', gender: 'M', birthday: '1997-11-03', parents: ['yf_m', 'yf_f'], children: ['xjz_c'], spouses: ['xjz_w'], bio: '淑芬的弟弟，在銀行上班。', posts: [], claimed: false },
+  'xjz_w': { id: 'xjz_w', name: '蔡雅婷', gender: 'F', birthday: '1998-05-20', parents: [], children: ['xjz_c'], spouses: ['xjz'], bio: '護理師，個性開朗。', posts: [], claimed: false },
+  'xjz_c': { id: 'xjz_c', name: '陳宇竭', gender: 'M', birthday: '2024-06-12', parents: ['xjz', 'xjz_w'], children: [], spouses: [], bio: '活潑可愛的小男孩。', posts: [], claimed: false },
+  'xyz': { id: 'xyz', name: '陳佳琪', gender: 'F', birthday: '1999-08-15', parents: ['yf_m', 'yf_f'], children: ['xyz_c'], spouses: ['xyz_h'], bio: '淑芬的妹妹，幼稚園老師。', posts: [], claimed: false },
+  'xyz_h': { id: 'xyz_h', name: '劉承恩', gender: 'M', birthday: '1996-04-09', parents: [], children: ['xyz_c'], spouses: ['xyz'], bio: '軟體工程師，喜歡登山。', posts: [], claimed: false },
+  'xyz_c': { id: 'xyz_c', name: '劉小雨', gender: 'F', birthday: '2025-01-28', parents: ['xyz', 'xyz_h'], children: [], spouses: [], bio: '剛出生的小寶貝。', posts: [], claimed: false },
   'm4': { id: 'm4', name: '王心凌', gender: 'F', birthday: '1996-02-14', parents: ['m1', 'm2'], children: ['g4_m1'], spouses: ['g3_m1'], bio: '小女兒，自由撰稿人。', posts: [{ id: 'p2', date: '2026-01-05', text: '剛完成了一本新書的初稿！' }], claimed: false },
   'g3_m1': { id: 'g3_m1', name: '李大為', gender: 'M', birthday: '1992-12-01', parents: [], children: ['g4_m1'], spouses: ['m4'], bio: '攝影師，喜歡四處旅遊。', posts: [], claimed: false },
   'g3_m3': { id: 'g3_m3', name: '王志強', gender: 'M', birthday: '1995-07-30', parents: ['g2_m2', 'g2_f2'], children: ['g4_m2'], spouses: ['g3_f2'], bio: '建國的堂弟，從事貿易。', posts: [], claimed: false },
@@ -210,6 +216,31 @@ const resolveAgeAwareKinship = (fromId, toId, members, path) => {
     if (path[0] === 'M' && path[2] === 'D' && path[3] === 'H') return '姨丈';
   }
 
+  // 大舅子/小舅子、大姨子/小姨子 (妻子的兄弟姊妹，依對方與妻子的生日比較)
+  if (path.length === 3 && (path[0] === 'W' || path[0] === 'H') && (path[1] === 'F' || path[1] === 'M') && (path[2] === 'S' || path[2] === 'D')) {
+    // 找到配偶本人
+    const spouse = (from.spouses || []).map(sid => members[sid]).find(sp => sp && sp.gender === (path[0] === 'W' ? 'F' : 'M'));
+    const isOlderThanSpouse = spouse ? compareBirthdayOrder(to.birthday, spouse.birthday) : null;
+
+    if (path[0] === 'W' && path[2] === 'S') return getOlderLabel(isOlderThanSpouse, '大舅子', '小舅子', '大舅子/小舅子');
+    if (path[0] === 'W' && path[2] === 'D') return getOlderLabel(isOlderThanSpouse, '大姨子', '小姨子', '大姨子/小姨子');
+    if (path[0] === 'H' && path[2] === 'S') return getOlderLabel(isOlderThanSpouse, '大伯', '小叔', '大伯/小叔');
+    if (path[0] === 'H' && path[2] === 'D') return getOlderLabel(isOlderThanSpouse, '大姑', '小姑', '大姑/小姑');
+  }
+
+  // 舅嫂/弟媳、襟兄/襟弟、妯娌、姑爺 (配偶兄弟姊妹的配偶，依生日判斷)
+  if (path.length === 4 && (path[0] === 'W' || path[0] === 'H') && (path[1] === 'F' || path[1] === 'M') && (path[2] === 'S' || path[2] === 'D') && (path[3] === 'W' || path[3] === 'H')) {
+    const mySpouse = (from.spouses || []).map(sid => members[sid]).find(sp => sp && sp.gender === (path[0] === 'W' ? 'F' : 'M'));
+    // 中間的兄弟姊妹 = to 的配偶
+    const sibling = (to.spouses || []).map(sid => members[sid]).find(Boolean);
+    const isOlderThanSpouse = (mySpouse && sibling) ? compareBirthdayOrder(sibling.birthday, mySpouse.birthday) : null;
+
+    if (path[0] === 'W' && path[2] === 'S' && path[3] === 'W') return getOlderLabel(isOlderThanSpouse, '舅嫂', '弟媳', '舅嫂/弟媳');
+    if (path[0] === 'W' && path[2] === 'D' && path[3] === 'H') return getOlderLabel(isOlderThanSpouse, '襟兄', '襟弟', '襟兄/襟弟');
+    if (path[0] === 'H' && path[2] === 'S' && path[3] === 'W') return getOlderLabel(isOlderThanSpouse, '大嫂', '弟媳', '妯娌');
+    if (path[0] === 'H' && path[2] === 'D' && path[3] === 'H') return getOlderLabel(isOlderThanSpouse, '大姑爺', '小姑爺', '姑爺');
+  }
+
   // 堂/表 + 哥弟姊妹
   if (path.length >= 4 && (path[path.length - 1] === 'S' || path[path.length - 1] === 'D')) {
     const cousinType = getCousinTypeByPath(path);
@@ -256,6 +287,8 @@ const translatePath = (path, targetGender) => {
     'M,F,S,W': '舅媽', 'M,M,S,W': '舅媽', 'M,F,D,H': '姨丈', 'M,M,D,H': '姨丈',
     'F,S,S,W': '姪媳婦', 'F,S,D,H': '姪女婿', 'M,S,S,W': '姪媳婦', 'M,S,D,H': '姪女婿',
     'F,D,S,W': '外甥媳婦', 'F,D,D,H': '外甥女婿', 'M,D,S,W': '外甥媳婦', 'M,D,D,H': '外甥女婿',
+    'W,F,S,W': '舅嫂/弟媳', 'W,M,S,W': '舅嫂/弟媳', 'W,F,D,H': '襟兄/襟弟', 'W,M,D,H': '襟兄/襟弟',
+    'H,F,S,W': '妯娌', 'H,M,S,W': '妯娌', 'H,F,D,H': '姑爺', 'H,M,D,H': '姑爺',
   };
   if (map[p]) return map[p];
 
@@ -318,6 +351,8 @@ export default function App() {
   const [qaContext, setQaContext] = useState(null); 
   const [isQROpen, setIsQROpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false); 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showInLaws, setShowInLaws] = useState(true);
   const fileInputRef = useRef(null);
   const savedTreeRef = useRef(null);
 
@@ -570,7 +605,8 @@ export default function App() {
     <div className="flex h-[100dvh] w-full bg-[#F5F5F0] overflow-hidden font-sans text-gray-800 relative">
       <div className="relative flex-1 h-full">
         <CanvasTree 
-          members={members} 
+          members={members}
+          showInLaws={showInLaws}
           selectedId={selectedId}
           onSelect={handleCanvasSelect}
           meId={meId}
@@ -625,6 +661,10 @@ export default function App() {
                 <Upload size={14}/> <span className="hidden sm:inline">載入</span>
                 <input type="file" accept=".json" className="hidden" onChange={handleImportJSON} ref={fileInputRef}/>
               </label>
+              <span className="text-gray-300 hidden sm:inline">|</span>
+              <button onClick={() => setIsSettingsOpen(true)} className="hover:text-emerald-600 flex items-center gap-1 transition p-1 bg-gray-50/50 rounded">
+                <Settings size={14}/> <span className="hidden sm:inline">設定</span>
+              </button>
               <span className="text-gray-300 hidden sm:inline">|</span>
               <button onClick={() => setIsResetOpen(true)} className="hover:text-red-500 text-red-400 flex items-center gap-1 transition p-1 bg-gray-50/50 rounded">
                 <RefreshCcw size={14}/> <span className="hidden sm:inline">重新開始</span>
@@ -741,6 +781,31 @@ export default function App() {
         />
       )}
 
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setIsSettingsOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Settings size={20} className="text-emerald-600"/> 設定</h2>
+              <button onClick={() => setIsSettingsOpen(false)} className="p-1 hover:bg-gray-100 rounded-full transition"><X size={20}/></button>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-700">顯示姻親家族（岳家／婆家等）</span>
+                <button 
+                  type="button"
+                  role="switch"
+                  aria-checked={showInLaws}
+                  onClick={() => setShowInLaws(v => !v)}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${showInLaws ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                >
+                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showInLaws ? 'translate-x-5' : ''}`}/>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isResetOpen && (
         <ResetModal 
           onClose={() => setIsResetOpen(false)}
@@ -849,7 +914,7 @@ export default function App() {
 // ==========================================
 // 4. Canvas 互動族譜樹核心組件 (重寫版平滑物理引擎)
 // ==========================================
-const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, searchHighlightId, onQuickAdd, onOpenMobileSearch }) => {
+const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, focusId, focusKey, searchHighlightId, onQuickAdd, onOpenMobileSearch }) => {
   const canvasRef = useRef(null);
   const dprRef = useRef(typeof window !== 'undefined' ? Math.max(1, window.devicePixelRatio || 1) : 1);
   const suppressMouseUntilRef = useRef(0);
@@ -1228,7 +1293,65 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
     let newLinks = [];
     let familiesMap = {};
 
-    const memberIds = Object.keys(members);
+    // --- Filter in-law families if showInLaws is off ---
+    // Patrilineal approach:
+    // Step 1: From meId go UP — add all parents but only recurse upward through male parents (父系)
+    // Step 2: From all discovered ancestors, go DOWN through all children → blood descendants
+    // Step 3: Add direct spouses of blood members (keep them, but not their parents/siblings)
+    let effectiveMembers = members;
+    if (!showInLaws) {
+      // Step 1: patrilineal ancestors
+      const ancestors = new Set();
+      ancestors.add(meId);
+      const upQ = [meId];
+      while (upQ.length > 0) {
+        const cur = upQ.shift();
+        const cm = members[cur];
+        if (!cm) continue;
+        cm.parents.forEach(pid => {
+          if (!ancestors.has(pid) && members[pid]) {
+            ancestors.add(pid);
+            // Only continue upward through male parent (patrilineal line)
+            if (members[pid].gender === 'M') {
+              upQ.push(pid);
+            }
+          }
+        });
+      }
+
+      // Step 2: from all ancestors, go DOWN through children
+      const blood = new Set(ancestors);
+      const downQ = [...ancestors];
+      while (downQ.length > 0) {
+        const cur = downQ.shift();
+        const cm = members[cur];
+        if (!cm) continue;
+        cm.children.forEach(cid => {
+          if (!blood.has(cid) && members[cid]) { blood.add(cid); downQ.push(cid); }
+        });
+      }
+
+      // Step 3: add direct spouses of blood members
+      const keepSet = new Set(blood);
+      blood.forEach(bid => {
+        const bm = members[bid];
+        if (bm) bm.spouses.forEach(sid => keepSet.add(sid));
+      });
+
+      // Filter
+      effectiveMembers = {};
+      Object.keys(members).forEach(id => {
+        if (keepSet.has(id)) {
+          const m = { ...members[id] };
+          m.parents = m.parents.filter(pid => keepSet.has(pid));
+          m.children = m.children.filter(cid => keepSet.has(cid));
+          m.spouses = m.spouses.filter(sid => keepSet.has(sid));
+          effectiveMembers[id] = m;
+        }
+      });
+    }
+
+    const memberIds = Object.keys(effectiveMembers);
     const isReset = memberIds.length === 1;
 
     // 計算世代 (簡單 BFS)
@@ -1241,7 +1364,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       while (queue.length > 0) {
         let curr = queue.shift();
         let curGen = generations[curr];
-        let m = members[curr];
+        let m = effectiveMembers[curr];
         
         m.children.forEach(id => { if (!visited.has(id)) { visited.add(id); generations[id] = curGen + 1; queue.push(id); } });
         m.spouses.forEach(id => { if (!visited.has(id)) { visited.add(id); generations[id] = curGen; queue.push(id); } });
@@ -1249,7 +1372,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       }
     }
 
-    Object.values(members).forEach(m => {
+    Object.values(effectiveMembers).forEach(m => {
       const existing = engine.nodes.find(n => n.id === m.id);
       
       // 優化出生點：如果是新成員，盡量出生在親戚附近，避免節點從遠方彈射
@@ -1283,7 +1406,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       newNodes.push(node);
     });
 
-    Object.values(members).forEach(m => {
+    Object.values(effectiveMembers).forEach(m => {
       m.spouses.forEach(sid => {
         if (m.id < sid && nodeMap[m.id] && nodeMap[sid]) {
           newLinks.push({ source: nodeMap[m.id], target: nodeMap[sid], type: 'spouse' });
@@ -1335,7 +1458,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       engine.transform.x = window.innerWidth / 2;
       engine.transform.y = window.innerHeight / 4;
     }
-  }, [members, meId]);
+  }, [members, meId, showInLaws]);
 
   useEffect(() => {
     if (!focusId) return;
