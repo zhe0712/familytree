@@ -182,7 +182,8 @@ export default function App() {
 
   const handleSelectFromSearch = (id) => {
     if (!members[id]) return;
-    setSelectedId(id);
+    const isMobileViewport = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+    setSelectedId(isMobileViewport ? null : id);
     setSearchFocusId(id);
     setSearchFocusKey(prev => prev + 1);
     setSearchHighlightId(id);
@@ -763,9 +764,10 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
     if (!node || !canvas) return;
 
     const targetScale = Math.max(0.75, engine.transform.scale);
+    const rect = canvas.getBoundingClientRect();
     engine.transform.scale = targetScale;
-    engine.transform.x = canvas.width / 2 - node.x * targetScale;
-    engine.transform.y = canvas.height / 2 - node.y * targetScale;
+    engine.transform.x = rect.width / 2 - node.x * targetScale;
+    engine.transform.y = rect.height / 2 - node.y * targetScale;
   }, [focusId, focusKey, members]);
 
   useEffect(() => {
