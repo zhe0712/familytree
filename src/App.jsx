@@ -858,7 +858,6 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
     const spouseGap = 130;
 
     const genMap = new Map();
-    const baseRowXById = new Map();
     nodes.forEach(n => {
       n.isHidden = hiddenNodes.has(n.id);
       if (!n.isHidden) {
@@ -889,7 +888,6 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       let cursor = -((row.length - 1) * colSpacing) / 2;
       row.forEach(n => {
         if (typeof n.targetX !== 'number') n.targetX = n.x;
-        baseRowXById.set(n.id, cursor);
         n.targetX = cursor;
         n.targetY = n.gen * rowSpacing;
         cursor += colSpacing;
@@ -926,117 +924,137 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         });
     });
 
-    // Final overlap resolver per generation.
+    // Deterministic row packing: spouse priority, then same-parent siblings, then singles.
     sortedGens.forEach(gen => {
-      const row = (genMap.get(gen) || []).slice().sort((a, b) => a.targetX - b.targetX);
-      for (let i = 1; i < row.length; i++) {
-        const prev = row[i - 1];
-        const curr = row[i];
-        const related = prev.data.spouses.includes(curr.id) || curr.data.spouses.includes(prev.id);
-        const minGap = related ? 125 : 150;
-        const gap = curr.targetX - prev.targetX;
-        if (gap < minGap) {
-          curr.targetX = prev.targetX + minGap;
-        }
-      }
+      const row = (genMap.get(gen) || []).filter(n => !n.isHidden);
+      if (row.length === 0) return;
 
-      if (row.length > 0) {
-        const centerShift = (row[0].targetX + row[row.length - 1].targetX) / 2;
-        row.forEach(n => {
-          n.targetX -= centerShift;
-        });
-      }
-    });
+      const rowSet = new Set(row.map(n => n.id));
+      const rowById = new Map(row.map(n => [n.id, n]));
+      const assigned = new Set();
+      const units = [];
+      const siblingGap = 145;
+      const unitGap = 170;
 
-    // Keep spouses adjacent and prevent unrelated relatives from being placed between them.
-    const spousePad = 30;
-    const enforceSpouseCorridors = () => {
+      // Priority 1: spouse pairs stay adjacent.
+      const seenPairs = new Set();
       links.forEach(link => {
         if (link.type !== 'spouse') return;
         const a = link.source;
         const b = link.target;
+        if (a.gen !== gen || b.gen !== gen) return;
         if (a.isHidden || b.isHidden) return;
-        if (a.gen !== b.gen) return;
+        if (!rowSet.has(a.id) || !rowSet.has(b.id)) return;
+        const pairKey = [a.id, b.id].sort().join('|');
+        if (seenPairs.has(pairKey)) return;
+        seenPairs.add(pairKey);
+        if (assigned.has(a.id) || assigned.has(b.id)) return;
 
-        const pairCenterX = (a.targetX + b.targetX) / 2;
-        a.targetX = pairCenterX - spouseGap / 2;
-        b.targetX = pairCenterX + spouseGap / 2;
-
-        const minX = Math.min(a.targetX, b.targetX) - spousePad;
-        const maxX = Math.max(a.targetX, b.targetX) + spousePad;
-        const corridorCenterX = (minX + maxX) / 2;
-
-        (genMap.get(a.gen) || []).forEach(node => {
-          if (node.id === a.id || node.id === b.id || node.isHidden) return;
-          if (node.targetX > minX && node.targetX < maxX) {
-            const baseX = baseRowXById.get(node.id) ?? node.targetX;
-            const shouldGoLeft = baseX < corridorCenterX || (baseX === corridorCenterX && node.id < a.id);
-            node.targetX = shouldGoLeft ? minX - 14 : maxX + 14;
-          }
+        const nodesInUnit = [a, b].sort((n1, n2) => n1.targetX - n2.targetX);
+        units.push({
+          type: 'spouse',
+          priority: 0,
+          key: pairKey,
+          nodes: nodesInUnit,
+          width: spouseGap,
+          anchor: (a.targetX + b.targetX) / 2,
         });
+        assigned.add(a.id);
+        assigned.add(b.id);
       });
-    };
 
-    // Priority 1: spouse adjacency
-    for (let pass = 0; pass < 2; pass++) enforceSpouseCorridors();
+      // Priority 2: same-parent sibling groups remain contiguous.
+      const siblingGroups = new Map();
+      row.forEach(node => {
+        if (assigned.has(node.id)) return;
+        const pids = (node.data.parents || []).slice().sort();
+        if (pids.length === 0) return;
+        const key = pids.join(',');
+        if (!siblingGroups.has(key)) siblingGroups.set(key, []);
+        siblingGroups.get(key).push(node);
+      });
 
-    // Priority 2: siblings (same parents) stay contiguous without unrelated nodes inserted.
-    const siblingGap = 145;
-    const siblingPad = 24;
-    for (let pass = 0; pass < 2; pass++) {
-      sortedGens.forEach(gen => {
-        const row = (genMap.get(gen) || []).filter(n => !n.isHidden);
-        if (row.length <= 1) return;
-
-        const spouseMemberIds = new Set();
-        links.forEach(link => {
-          if (link.type !== 'spouse') return;
-          if (link.source.gen !== gen || link.target.gen !== gen) return;
-          if (link.source.isHidden || link.target.isHidden) return;
-          spouseMemberIds.add(link.source.id);
-          spouseMemberIds.add(link.target.id);
+      siblingGroups.forEach((group, key) => {
+        if (group.length < 2) return;
+        group.sort((a, b) => a.targetX - b.targetX);
+        units.push({
+          type: 'siblings',
+          priority: 1,
+          key,
+          nodes: group,
+          width: (group.length - 1) * siblingGap,
+          anchor: group.reduce((sum, n) => sum + n.targetX, 0) / group.length,
         });
+        group.forEach(n => assigned.add(n.id));
+      });
 
-        const siblingGroups = new Map();
-        row.forEach(node => {
-          const pids = (node.data.parents || []).slice().sort();
-          if (pids.length === 0) return;
-          const key = pids.join(',');
-          if (!siblingGroups.has(key)) siblingGroups.set(key, []);
-          siblingGroups.get(key).push(node);
-        });
-
-        siblingGroups.forEach(group => {
-          if (group.length < 2) return;
-          const movable = group.filter(n => !spouseMemberIds.has(n.id));
-          if (movable.length < 2) return;
-
-          const groupCenterX = movable.reduce((sum, n) => sum + n.targetX, 0) / movable.length;
-          const left = groupCenterX - ((movable.length - 1) * siblingGap) / 2;
-          movable
-            .slice()
-            .sort((a, b) => a.targetX - b.targetX)
-            .forEach((node, index) => {
-              node.targetX = left + index * siblingGap;
-            });
-
-          const minX = Math.min(...movable.map(n => n.targetX)) - siblingPad;
-          const maxX = Math.max(...movable.map(n => n.targetX)) + siblingPad;
-          const siblingCorridorCenterX = (minX + maxX) / 2;
-          row.forEach(node => {
-            if (movable.some(sib => sib.id === node.id)) return;
-            if (node.targetX > minX && node.targetX < maxX) {
-              const baseX = baseRowXById.get(node.id) ?? node.targetX;
-              const shouldGoLeft = baseX < siblingCorridorCenterX || (baseX === siblingCorridorCenterX && node.id < movable[0].id);
-              node.targetX = shouldGoLeft ? minX - 14 : maxX + 14;
-            }
+      // Priority 3: remaining singles.
+      row
+        .filter(n => !assigned.has(n.id))
+        .sort((a, b) => a.targetX - b.targetX)
+        .forEach(n => {
+          units.push({
+            type: 'single',
+            priority: 2,
+            key: n.id,
+            nodes: [n],
+            width: 0,
+            anchor: n.targetX,
           });
+          assigned.add(n.id);
+        });
+
+      units.sort((a, b) => {
+        const dx = a.anchor - b.anchor;
+        if (Math.abs(dx) > 1e-6) return dx;
+        if (a.priority !== b.priority) return a.priority - b.priority;
+        return a.key.localeCompare(b.key);
+      });
+
+      let cursor = null;
+      units.forEach(unit => {
+        const minCenter = cursor === null ? unit.anchor : cursor + unit.width / 2;
+        const center = Math.max(unit.anchor, minCenter);
+        unit.center = center;
+        cursor = center + unit.width / 2 + unitGap;
+
+        if (unit.type === 'spouse') {
+          unit.nodes[0].targetX = center - spouseGap / 2;
+          unit.nodes[1].targetX = center + spouseGap / 2;
+          return;
+        }
+
+        if (unit.type === 'siblings') {
+          const left = center - unit.width / 2;
+          unit.nodes.forEach((node, index) => {
+            node.targetX = left + index * siblingGap;
+          });
+          return;
+        }
+
+        unit.nodes[0].targetX = center;
+      });
+
+      const placed = row.slice().sort((a, b) => a.targetX - b.targetX);
+      const centerShift = (placed[0].targetX + placed[placed.length - 1].targetX) / 2;
+      placed.forEach(n => {
+        n.targetX -= centerShift;
+      });
+
+      // Keep parent-child vertical links cleaner after packing.
+      families.forEach(fam => {
+        const children = fam.childIds.map(id => rowById.get(id)).filter(Boolean);
+        if (children.length === 0) return;
+        const parentNodes = fam.parentIds.map(id => rowById.get(id)).filter(Boolean);
+        if (parentNodes.length === 0) return;
+        const parentCenter = parentNodes.reduce((sum, p) => sum + p.targetX, 0) / parentNodes.length;
+        const sortedChildren = children.slice().sort((a, b) => a.targetX - b.targetX);
+        const left = parentCenter - ((sortedChildren.length - 1) * siblingGap) / 2;
+        sortedChildren.forEach((child, index) => {
+          child.targetX = left + index * siblingGap;
         });
       });
-    }
-
-    // Re-apply spouse rule so siblings never break couples.
-    for (let pass = 0; pass < 2; pass++) enforceSpouseCorridors();
+    });
 
     // Hidden nodes collapse toward nearest parent to keep transitions smooth.
     nodes.forEach(n => {
