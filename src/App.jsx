@@ -870,16 +870,42 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
 
     const sortedGens = [...genMap.keys()].sort((a, b) => a - b);
 
+    // Helper: get family sort key — if no parents, borrow from spouse's parents
+    const getFamilyKey = (n) => {
+      if (n.data.parents.length) return [...n.data.parents].sort().join(',');
+      for (const sid of n.data.spouses) {
+        const sp = nodes.find(s => s.id === sid);
+        if (sp && sp.data.parents.length) return [...sp.data.parents].sort().join(',');
+      }
+      return n.id;
+    };
+
+    // Helper: get couple sort key — spouse pairs share the blood member's id
+    const getCoupleKey = (n) => {
+      if (n.data.parents.length) return n.id;
+      // Married-in: use blood spouse's id so they sort adjacent
+      for (const sid of n.data.spouses) {
+        const sp = nodes.find(s => s.id === sid);
+        if (sp && sp.data.parents.length) return sp.id;
+      }
+      return n.id;
+    };
+
     sortedGens.forEach(gen => {
       const row = genMap.get(gen);
       row.sort((a, b) => {
-        const aFamily = a.data.parents.length ? [...a.data.parents].sort().join(',') : a.id;
-        const bFamily = b.data.parents.length ? [...b.data.parents].sort().join(',') : b.id;
+        // 1) Group by family (shared parents)
+        const aFamily = getFamilyKey(a);
+        const bFamily = getFamilyKey(b);
         if (aFamily !== bFamily) return aFamily.localeCompare(bFamily);
-        const aSpouseKey = a.data.spouses.slice().sort().join(',');
-        const bSpouseKey = b.data.spouses.slice().sort().join(',');
-        if (aSpouseKey !== bSpouseKey) return aSpouseKey.localeCompare(bSpouseKey);
-        return a.id.localeCompare(b.id);
+        // 2) Within family, group by couple (blood member + their spouse together)
+        const aCouple = getCoupleKey(a);
+        const bCouple = getCoupleKey(b);
+        if (aCouple !== bCouple) return aCouple.localeCompare(bCouple);
+        // 3) Within couple, blood member first
+        const aBlood = a.data.parents.length > 0 ? 0 : 1;
+        const bBlood = b.data.parents.length > 0 ? 0 : 1;
+        return aBlood - bBlood;
       });
 
       let cursor = -((row.length - 1) * colSpacing) / 2;
@@ -891,18 +917,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       });
     });
 
-    // Keep spouse nodes adjacent to reduce long crossing links.
-    links.forEach(link => {
-      if (link.type !== 'spouse') return;
-      const a = link.source;
-      const b = link.target;
-      if (a.isHidden || b.isHidden) return;
-      const centerX = (a.targetX + b.targetX) / 2;
-      a.targetX = centerX - spouseGap / 2;
-      b.targetX = centerX + spouseGap / 2;
-    });
-
-    // Anchor children near their parent group center.
+    // Anchor children near their parent group center (BEFORE spouse snap).
     families.forEach(fam => {
       const parents = fam.parentIds.map(id => nodes.find(n => n.id === id)).filter(Boolean).filter(n => !n.isHidden);
       const children = fam.childIds.map(id => nodes.find(n => n.id === id)).filter(Boolean).filter(n => !n.isHidden);
@@ -919,6 +934,17 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         .forEach((child, index) => {
           child.targetX = left + index * childSpacing;
         });
+    });
+
+    // Keep spouse nodes adjacent with tight spacing (AFTER children anchoring).
+    links.forEach(link => {
+      if (link.type !== 'spouse') return;
+      const a = link.source;
+      const b = link.target;
+      if (a.isHidden || b.isHidden) return;
+      const centerX = (a.targetX + b.targetX) / 2;
+      a.targetX = centerX - spouseGap / 2;
+      b.targetX = centerX + spouseGap / 2;
     });
 
     // Final overlap resolver per generation — symmetric push to avoid drift.
