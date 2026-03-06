@@ -860,7 +860,7 @@ export default function App() {
             const newId = generateId();
             const newMember = {
               id: newId, name: newName, gender: newGender,
-              parents: [], children: [], spouses: [], bio: '族譜建立者', posts: [], claimed: true, birthday: newBirthday || ''
+              parents: [], children: [], spouses: [], bio: '族譜建立者', posts: [], claimed: true, birthday: newBirthday || '', deathDate: ''
             };
             setTreeName(newTreeName);
             setMembers({ [newId]: newMember });
@@ -2179,6 +2179,15 @@ const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRel
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
+          <div className="mb-3">
+            <label className="block text-xs font-bold text-gray-500 mb-1">忌日</label>
+            <input
+              type="date"
+              value={member.deathDate || ''}
+              onChange={(e) => onUpdateMember(member.id, { deathDate: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
           <p className="text-gray-700 leading-relaxed text-sm">
             {member.bio || '尚未留下個人簡介。'}
           </p>
@@ -2285,13 +2294,13 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
   }, [context]);
 
   const [formData, setFormData] = useState({
-    name: '', gender: 'M', birthday: '',
+    name: '', gender: 'M', birthday: '', deathDate: '',
     relativeId: context?.relativeId || Object.keys(members)[0],
     relationType: context?.relationType || 'child'
   });
 
   const [textData, setTextData] = useState({
-    name: '', gender: 'M', birthday: '',
+    name: '', gender: 'M', birthday: '', deathDate: '',
     relativeId: context?.relativeId || Object.keys(members)[0],
     relationText: ''
   });
@@ -2355,7 +2364,7 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
       } else if (relType === 'sibling') {
         if (n1.parents.length === 0) {
           let dummyF = generateId();
-          draft[dummyF] = { id: dummyF, name: '未知(父親)', gender: 'M', birthday: '', parents: [], children: [id1, id2], spouses: [], bio: '', posts: [], claimed: false };
+          draft[dummyF] = { id: dummyF, name: '未知(父親)', gender: 'M', birthday: '', deathDate: '', parents: [], children: [id1, id2], spouses: [], bio: '', posts: [], claimed: false };
           addUnique(n1.parents, dummyF);
           addUnique(n2.parents, dummyF);
         } else {
@@ -2373,7 +2382,7 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
     e.preventDefault();
     let draft = JSON.parse(JSON.stringify(members));
     let newId = generateId();
-    draft[newId] = { id: newId, name: formData.name, gender: formData.gender, birthday: formData.birthday || '', parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
+    draft[newId] = { id: newId, name: formData.name, gender: formData.gender, birthday: formData.birthday || '', deathDate: formData.deathDate || '', parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
     linkNodes(draft, formData.relativeId, newId, formData.relationType);
     onSubmit(draft, newId);
   };
@@ -2418,14 +2427,14 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
 
               if (isLast) {
                   let newId = generateId();
-                  draft[newId] = { id: newId, name: textData.name || `新成員`, gender: textData.gender, birthday: textData.birthday || '', parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
+                  draft[newId] = { id: newId, name: textData.name || `新成員`, gender: textData.gender, birthday: textData.birthday || '', deathDate: textData.deathDate || '', parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
                   linkNodes(draft, currentId, newId, relType);
                   currentId = newId;
               } else {
                   let nextId = findExistingRelation(draft, currentId, relType, gender);
                   if (!nextId) {
                       nextId = generateId();
-                      draft[nextId] = { id: nextId, name: `未知(${step})`, gender: gender, birthday: '', parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
+                      draft[nextId] = { id: nextId, name: `未知(${step})`, gender: gender, birthday: '', deathDate: '', parents: [], children: [], spouses: [], bio: '', posts: [], claimed: false };
                       linkNodes(draft, currentId, nextId, relType);
                   }
                   currentId = nextId;
@@ -2466,7 +2475,16 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
                   <div className="space-y-2 pt-2 border-t border-gray-100">
                      <label className="block text-sm font-bold text-gray-700">3. 新成員姓名與性別</label>
                      <input type="text" required placeholder="輸入最終這位新成員的姓名" value={textData.name} onChange={e => setTextData({...textData, name: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none mb-2" />
-                    <input type="date" value={textData.birthday} onChange={e => setTextData({...textData, birthday: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none mb-2" />
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500 mb-1">生日</label>
+                        <input type="date" value={textData.birthday} onChange={e => setTextData({...textData, birthday: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500 mb-1">忌日</label>
+                        <input type="date" value={textData.deathDate} onChange={e => setTextData({...textData, deathDate: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                      </div>
+                    </div>
                      <div className="flex gap-4">
                        <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${textData.gender === 'M' ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="M" className="hidden" onChange={() => setTextData({...textData, gender: 'M'})} /> ♂ 男性</label>
                        <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${textData.gender === 'F' ? 'border-pink-500 bg-pink-50 text-pink-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="F" className="hidden" onChange={() => setTextData({...textData, gender: 'F'})} /> ♀ 女性</label>
@@ -2491,7 +2509,16 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
                   <div className="space-y-2 pt-2 border-t border-gray-100">
                      <label className="block text-sm font-bold text-gray-700">2. 基本資料</label>
                      <input autoFocus type="text" required placeholder="輸入姓名" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 text-lg focus:ring-2 focus:ring-emerald-500 outline-none mb-2" />
-                    <input type="date" value={formData.birthday} onChange={e => setFormData({...formData, birthday: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none mb-2" />
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500 mb-1">生日</label>
+                        <input type="date" value={formData.birthday} onChange={e => setFormData({...formData, birthday: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500 mb-1">忌日</label>
+                        <input type="date" value={formData.deathDate} onChange={e => setFormData({...formData, deathDate: e.target.value})} className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                      </div>
+                    </div>
                      <div className="flex gap-4">
                        <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${formData.gender === 'M' ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="M" className="hidden" onChange={() => setFormData({...formData, gender: 'M'})} /> ♂ 男性</label>
                        <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${formData.gender === 'F' ? 'border-pink-500 bg-pink-50 text-pink-700 font-bold' : 'border-gray-200 text-gray-500'}`}><input type="radio" value="F" className="hidden" onChange={() => setFormData({...formData, gender: 'F'})} /> ♀ 女性</label>
