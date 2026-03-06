@@ -269,8 +269,17 @@ export default function App() {
           <ProfilePanel 
             member={selectedMember} 
             kinship={calculateKinship(meId, selectedId, members)}
+            meId={meId}
             onClose={() => setSelectedId(null)}
-            onAddRelative={(type) => { setQaContext({ relativeId: selectedId, relationType: type }); setIsQAOpen(true); }}
+            onSetViewpoint={(id) => setMeId(id)}
+            onAddRelative={(type) => {
+              setQaContext({
+                relativeId: selectedId,
+                relationType: type,
+                preferredTab: 'form',
+              });
+              setIsQAOpen(true);
+            }}
             onShowQR={() => setIsQROpen(true)}
             onAddPost={handleAddPost}
             onUpdateMember={handleUpdateMember}
@@ -529,6 +538,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
       const node = {
         id: m.id, name: m.name, gender: m.gender,
         gen: generations[m.id] || 0,
+        isViewpoint: m.id === meId,
         kinship: calculateKinship(meId, m.id, members),
         x: initX, y: initY,
         targetX: existing ? existing.targetX : initX,
@@ -825,18 +835,26 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
         
         ctx.globalAlpha = n.isHidden ? 0 : 1;
         const isSelected = n.id === selectedId;
+        const isViewpoint = n.isViewpoint;
 
         ctx.shadowColor = 'rgba(0,0,0,0.15)';
         ctx.shadowBlur = 15;
         ctx.shadowOffsetY = 8;
 
+        if (isViewpoint && !n.isHidden) {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.radius + 10, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.22)';
+          ctx.fill();
+        }
+
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-        ctx.fillStyle = isSelected ? '#fff' : (n.gender === 'M' ? '#eff6ff' : '#fdf2f8');
+        ctx.fillStyle = isViewpoint ? '#ecfdf5' : (isSelected ? '#fff' : (n.gender === 'M' ? '#eff6ff' : '#fdf2f8'));
         ctx.fill();
         
-        ctx.lineWidth = isSelected ? 4 : 2;
-        ctx.strokeStyle = isSelected ? '#10b981' : (n.gender === 'M' ? '#3b82f6' : '#ec4899');
+        ctx.lineWidth = isViewpoint ? 5 : (isSelected ? 4 : 2);
+        ctx.strokeStyle = isViewpoint ? '#059669' : (isSelected ? '#10b981' : (n.gender === 'M' ? '#3b82f6' : '#ec4899'));
         ctx.stroke();
         ctx.shadowColor = 'transparent';
 
@@ -849,6 +867,16 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
         ctx.fillStyle = '#1e293b';
         ctx.font = 'bold 18px sans-serif';
         ctx.fillText(n.name, n.x, n.y + 10);
+
+        if (isViewpoint) {
+          ctx.beginPath();
+          ctx.arc(n.x - n.radius * 0.72, n.y - n.radius * 0.72, 11, 0, Math.PI * 2);
+          ctx.fillStyle = '#059669';
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 11px sans-serif';
+          ctx.fillText('我', n.x - n.radius * 0.72, n.y - n.radius * 0.72 + 1);
+        }
 
         if (n.data.claimed) {
            ctx.beginPath();
@@ -1026,7 +1054,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
 // ==========================================
 // 5. 側邊欄 - 個人資料面板
 // ==========================================
-const ProfilePanel = ({ member, kinship, onClose, onAddRelative, onShowQR, onAddPost, onUpdateMember, onDeleteMember }) => {
+const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRelative, onShowQR, onAddPost, onUpdateMember, onDeleteMember }) => {
   const [postText, setPostText] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(member.name);
@@ -1077,6 +1105,18 @@ const ProfilePanel = ({ member, kinship, onClose, onAddRelative, onShowQR, onAdd
             <div className="flex items-center gap-2 mt-1 opacity-90">
               <span className="bg-white/20 px-2 py-0.5 rounded text-sm font-medium tracking-widest">{kinship}</span>
               {member.gender === 'M' ? <span className="text-blue-200 font-bold">♂ 男</span> : <span className="text-pink-200 font-bold">♀ 女</span>}
+            </div>
+            <div className="mt-2">
+              {meId === member.id ? (
+                <span className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-500/25 px-2 py-1 rounded-lg">目前視角</span>
+              ) : (
+                <button
+                  onClick={() => onSetViewpoint(member.id)}
+                  className="text-xs font-bold bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg transition"
+                >
+                  切換成此視角
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1198,8 +1238,12 @@ const StartModal = ({ onCreate, onLoadTemplate }) => {
 // 6. 雙模式新增成員 Modal
 // ==========================================
 const QAModal = ({ context, members, onClose, onSubmit }) => {
-  const [tab, setTab] = useState('text'); 
+  const [tab, setTab] = useState(context?.preferredTab || 'text'); 
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    setTab(context?.preferredTab || 'text');
+  }, [context]);
 
   const [formData, setFormData] = useState({
     name: '', gender: 'M',
