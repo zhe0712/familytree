@@ -133,13 +133,16 @@ const BIAO_SISTER_PATTERNS = new Set([
 
 const getCousinTypeByPath = (path) => {
   if (path.length !== 4) return null;
+  // 堂表兄弟姊妹必須是 2-up-2-down 模式 (前2步=F/M上行, 後2步=S/D下行)
+  // 排除 3-up-1-down 模式 (祖父母的兄弟姊妹，如姨婆、叔公等)
+  if (path[2] === 'F' || path[2] === 'M') return null;
   const p = path.join(',');
   if (TANG_BROTHER_PATTERNS.has(p) || TANG_SISTER_PATTERNS.has(p)) return 'tang';
   if (BIAO_BROTHER_PATTERNS.has(p) || BIAO_SISTER_PATTERNS.has(p)) return 'biao';
 
   // Fallback: 父系叔伯的子女 = 堂, 其餘 = 表
   if (p.startsWith('F,F,S,') || p.startsWith('F,M,S,')) return 'tang';
-  if (p.startsWith('M,F,') || p.startsWith('M,M,') || p.startsWith('F,F,D,') || p.startsWith('F,M,D,')) return 'biao';
+  if (p.startsWith('M,F,S,') || p.startsWith('M,M,S,') || p.startsWith('F,F,D,') || p.startsWith('F,M,D,') || p.startsWith('M,F,D,') || p.startsWith('M,M,D,')) return 'biao';
   return null;
 };
 
@@ -315,6 +318,16 @@ const translatePath = (path, targetGender) => {
     'H,F,S,S': '夫姪', 'H,M,S,S': '夫姪', 'H,F,S,D': '夫姪女', 'H,M,S,D': '夫姪女',
     // 大姑/小姑的子女
     'H,F,D,S': '夫甥', 'H,M,D,S': '夫甥', 'H,F,D,D': '夫甥女', 'H,M,D,D': '夫甥女',
+    // 祖父母輩的兄弟姊妹 (3-up-1-down)
+    'F,F,F,S': '叔公/伯公', 'F,F,M,S': '叔公/伯公', 'F,F,F,D': '姑婆', 'F,F,M,D': '姑婆',
+    'F,M,F,S': '舅公', 'F,M,M,S': '舅公', 'F,M,F,D': '姨婆', 'F,M,M,D': '姨婆',
+    'M,F,F,S': '叔公/伯公', 'M,F,M,S': '叔公/伯公', 'M,F,F,D': '姑婆', 'M,F,M,D': '姑婆',
+    'M,M,F,S': '舅公', 'M,M,M,S': '舅公', 'M,M,F,D': '姨婆', 'M,M,M,D': '姨婆',
+    // 祖父母輩兄弟姊妹的配偶 (3-up-1-down + spouse)
+    'F,F,F,S,W': '嬸婆', 'F,F,M,S,W': '嬸婆', 'F,F,F,D,H': '姑丈公', 'F,F,M,D,H': '姑丈公',
+    'F,M,F,S,W': '舅婆', 'F,M,M,S,W': '舅婆', 'F,M,F,D,H': '姨丈公', 'F,M,M,D,H': '姨丈公',
+    'M,F,F,S,W': '嬸婆', 'M,F,M,S,W': '嬸婆', 'M,F,F,D,H': '姑丈公', 'M,F,M,D,H': '姑丈公',
+    'M,M,F,S,W': '舅婆', 'M,M,M,S,W': '舅婆', 'M,M,F,D,H': '姨丈公', 'M,M,M,D,H': '姨丈公',
   };
   if (map[p]) return map[p];
 
