@@ -1305,7 +1305,6 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
   // --- 新增：行動裝置觸控事件 (Touch Events) ---
   const handleTouchStart = (e) => {
     suppressMouseUntilRef.current = Date.now() + 700;
-    e.preventDefault();
 
     if (e.touches.length === 1) {
       handleMouseDown(
