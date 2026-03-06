@@ -100,6 +100,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [searchFocusId, setSearchFocusId] = useState(null);
+  const [searchFocusKey, setSearchFocusKey] = useState(0);
   const [searchHighlightId, setSearchHighlightId] = useState(null);
   
   const [isQAOpen, setIsQAOpen] = useState(false);
@@ -183,6 +184,7 @@ export default function App() {
     if (!members[id]) return;
     setSelectedId(id);
     setSearchFocusId(id);
+    setSearchFocusKey(prev => prev + 1);
     setSearchHighlightId(id);
     setSearchQuery(members[id].name);
     setIsSearchOpen(false);
@@ -235,6 +237,7 @@ export default function App() {
           onSelect={setSelectedId}
           meId={meId}
           focusId={searchFocusId}
+          focusKey={searchFocusKey}
           searchHighlightId={searchHighlightId}
           onQuickAdd={() => {
             setQaContext({ relativeId: selectedId || meId, relationType: 'child' });
@@ -493,7 +496,7 @@ export default function App() {
 // ==========================================
 // 4. Canvas 互動族譜樹核心組件 (重寫版平滑物理引擎)
 // ==========================================
-const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighlightId, onQuickAdd, onOpenMobileSearch }) => {
+const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, searchHighlightId, onQuickAdd, onOpenMobileSearch }) => {
   const canvasRef = useRef(null);
   const dprRef = useRef(typeof window !== 'undefined' ? Math.max(1, window.devicePixelRatio || 1) : 1);
   const suppressMouseUntilRef = useRef(0);
@@ -763,7 +766,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, searchHighli
     engine.transform.scale = targetScale;
     engine.transform.x = canvas.width / 2 - node.x * targetScale;
     engine.transform.y = canvas.height / 2 - node.y * targetScale;
-  }, [focusId, members]);
+  }, [focusId, focusKey, members]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
