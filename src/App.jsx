@@ -1309,12 +1309,18 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
 
       if (childIds.length === 0) return;
 
-      // Calculate each child's subtree width
+      // Calculate each child's subtree width (must match calcWidth formula!)
       const childWidths = childIds.map(cid => {
         const cSpouses = getSpouses(cid);
         const subtreeW = unitWidth[cid] || spouseGap;
+        // Include spouse's subtree extra width (same logic as calcWidth)
+        let spouseExtraW = 0;
+        cSpouses.forEach(sp => {
+          const spW = unitWidth[sp.id] || spouseGap;
+          if (spW > spouseGap) spouseExtraW += (spW - spouseGap);
+        });
         const ownW = cSpouses.length > 0 ? spouseGap * cSpouses.length : 0;
-        return Math.max(subtreeW, ownW, spouseGap);
+        return Math.max(subtreeW + spouseExtraW, ownW, spouseGap);
       });
 
       const totalChildrenWidth = childWidths.reduce((s, w) => s + w, 0) + (childIds.length - 1) * (unitGap - spouseGap);
@@ -1420,8 +1426,14 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
         const childWidths = unposChildIds.map(cid => {
           const cSp = getSpouses(cid);
           const subtreeW = unitWidth[cid] || spouseGap;
+          // Include spouse's subtree extra width (same logic as calcWidth)
+          let spouseExtraW = 0;
+          cSp.forEach(sp => {
+            const spW = unitWidth[sp.id] || spouseGap;
+            if (spW > spouseGap) spouseExtraW += (spW - spouseGap);
+          });
           const ownW = cSp.length > 0 ? spouseGap * cSp.length : 0;
-          return Math.max(subtreeW, ownW, spouseGap);
+          return Math.max(subtreeW + spouseExtraW, ownW, spouseGap);
         });
         const posChildIds = [...new Set(mems.flatMap(mid =>
           (nodeById[mid].data.children || []).filter(cid => positioned.has(cid) && nodeById[cid] && !nodeById[cid].isHidden)
@@ -1572,8 +1584,10 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
           if (gap < minGap) {
             const fix = minGap - gap;
             anyFix = true;
-            // Push current block (and all subsequent blocks) to the right
-            currBlock.forEach(n => { n.targetX += fix; });
+            // Push current block AND all subsequent blocks to the right
+            for (let bj = bi; bj < blocks.length; bj++) {
+              blocks[bj].forEach(n => { n.targetX += fix; });
+            }
           }
         }
         if (!anyFix) break;
@@ -1905,18 +1919,35 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
       ctx.translate(transform.x, transform.y);
       ctx.scale(transform.scale, transform.scale);
 
+      // Build set of IDs related to selected node for line highlighting
+      const selectedRelIds = new Set();
+      if (selectedId && members[selectedId]) {
+        const sm = members[selectedId];
+        selectedRelIds.add(selectedId);
+        (sm.parents || []).forEach(id => selectedRelIds.add(id));
+        (sm.children || []).forEach(id => selectedRelIds.add(id));
+        (sm.spouses || []).forEach(id => selectedRelIds.add(id));
+      }
+
       // 繪製配偶連線
-      ctx.lineWidth = 3;
       links.forEach(l => {
         if (l.type === 'spouse' && !l.source.isHidden && !l.target.isHidden) {
+          const isHighlighted = selectedId && (l.source.id === selectedId || l.target.id === selectedId);
           const midX = (l.source.x + l.target.x) / 2;
           const archY = Math.min(l.source.y, l.target.y) - 24;
           ctx.beginPath();
-          ctx.strokeStyle = '#fca5a5';
-          ctx.setLineDash([6, 6]);
+          ctx.lineWidth = isHighlighted ? 4 : 2;
+          ctx.strokeStyle = isHighlighted ? '#e11d48' : '#e2a5b3';
+          ctx.setLineDash(isHighlighted ? [] : [6, 4]);
+          if (isHighlighted) {
+            ctx.shadowColor = 'rgba(225, 29, 72, 0.45)';
+            ctx.shadowBlur = 14;
+          }
           ctx.moveTo(l.source.x, l.source.y + 4);
           ctx.quadraticCurveTo(midX, archY, l.target.x, l.target.y + 4);
           ctx.stroke();
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
         }
       });
       ctx.setLineDash([]);
@@ -2002,9 +2033,18 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
           midY = Math.max(midY, pMaxY + 20);
         }
 
+        // Check if this family is related to the selected node
+        const famIsHighlighted = selectedId && (
+          fam.parentIds.includes(selectedId) || fam.childIds.includes(selectedId)
+        );
+
         ctx.beginPath();
-        ctx.strokeStyle = '#cbd5e1';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = famIsHighlighted ? '#6366f1' : '#c7cad4';
+        ctx.lineWidth = famIsHighlighted ? 4 : 2.5;
+        if (famIsHighlighted) {
+          ctx.shadowColor = 'rgba(99, 102, 241, 0.45)';
+          ctx.shadowBlur = 14;
+        }
 
         visibleParents.forEach(parent => {
           const parentBottomY = parent.y + parent.radius;
@@ -2033,6 +2073,8 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
           });
         }
         ctx.stroke();
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
 
         fam.buttonX = pX;
         fam.buttonY = midY;
