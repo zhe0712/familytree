@@ -941,6 +941,34 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       }
     });
 
+    // Keep spouses adjacent and prevent unrelated relatives from being placed between them.
+    const spousePad = 30;
+    for (let pass = 0; pass < 2; pass++) {
+      links.forEach(link => {
+        if (link.type !== 'spouse') return;
+        const a = link.source;
+        const b = link.target;
+        if (a.isHidden || b.isHidden) return;
+        if (a.gen !== b.gen) return;
+
+        const centerX = (a.targetX + b.targetX) / 2;
+        a.targetX = centerX - spouseGap / 2;
+        b.targetX = centerX + spouseGap / 2;
+
+        const minX = Math.min(a.targetX, b.targetX) - spousePad;
+        const maxX = Math.max(a.targetX, b.targetX) + spousePad;
+
+        (genMap.get(a.gen) || []).forEach(node => {
+          if (node.id === a.id || node.id === b.id || node.isHidden) return;
+          if (node.targetX > minX && node.targetX < maxX) {
+            const toLeft = Math.abs(node.targetX - minX);
+            const toRight = Math.abs(maxX - node.targetX);
+            node.targetX = toLeft < toRight ? minX - 14 : maxX + 14;
+          }
+        });
+      });
+    }
+
     // Hidden nodes collapse toward nearest parent to keep transitions smooth.
     nodes.forEach(n => {
       if (!n.isHidden) return;
