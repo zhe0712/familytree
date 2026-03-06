@@ -495,6 +495,27 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
       }
     });
 
+    const existingSpousePairs = new Set(
+      newLinks
+        .filter(l => l.type === 'spouse')
+        .map(l => [l.source.id, l.target.id].sort().join('|'))
+    );
+
+    Object.values(familiesMap).forEach(fam => {
+      const visibleParents = fam.parentIds.filter(pid => nodeMap[pid]);
+      for (let i = 0; i < visibleParents.length; i++) {
+        for (let j = i + 1; j < visibleParents.length; j++) {
+          const a = visibleParents[i];
+          const b = visibleParents[j];
+          const key = [a, b].sort().join('|');
+          if (!existingSpousePairs.has(key)) {
+            newLinks.push({ source: nodeMap[a], target: nodeMap[b], type: 'spouse' });
+            existingSpousePairs.add(key);
+          }
+        }
+      }
+    });
+
     engine.nodes = newNodes;
     engine.links = newLinks;
     engine.families = Object.values(familiesMap);
@@ -608,26 +629,64 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
       ctx.setLineDash([]);
 
       // 繪製親子連線與收合按鈕
-      const familyRows = {};
       const familyItems = families.map(fam => {
         const parents = fam.parentIds.map(id => nodes.find(n => n.id === id)).filter(Boolean);
         const children = fam.childIds.map(id => nodes.find(n => n.id === id)).filter(Boolean);
         return { fam, parents, children };
       }).filter(item => item.parents.length > 0 && item.children.length > 0);
 
+      // Route families on separate lanes only when their horizontal spans overlap.
+      const laneTracker = {};
+
+      familyItems.forEach(item => {
+        const visibleParents = item.parents.filter(p => !p.isHidden);
+        const visibleChildren = item.children.filter(c => !c.isHidden);
+        const parentGen = visibleParents.length > 0
+          ? Math.round(visibleParents.reduce((sum, p) => sum + p.gen, 0) / visibleParents.length)
+          : Math.round(item.parents.reduce((sum, p) => sum + p.gen, 0) / item.parents.length);
+
+        const xCandidates = [
+          ...visibleParents.map(p => p.x),
+          ...visibleChildren.map(c => c.x),
+        ];
+
+        const minX = xCandidates.length > 0 ? Math.min(...xCandidates) : 0;
+        const maxX = xCandidates.length > 0 ? Math.max(...xCandidates) : 0;
+
+        item.parentGen = parentGen;
+        item.rangeMinX = minX - 16;
+        item.rangeMaxX = maxX + 16;
+      });
+
       familyItems
         .sort((a, b) => {
           const aCenter = a.parents.reduce((sum, p) => sum + p.x, 0) / a.parents.length;
           const bCenter = b.parents.reduce((sum, p) => sum + p.x, 0) / b.parents.length;
-          const aGen = Math.round(a.parents.reduce((sum, p) => sum + p.gen, 0) / a.parents.length);
-          const bGen = Math.round(b.parents.reduce((sum, p) => sum + p.gen, 0) / b.parents.length);
+          const aGen = a.parentGen;
+          const bGen = b.parentGen;
           if (aGen !== bGen) return aGen - bGen;
           return aCenter - bCenter;
         })
         .forEach(item => {
-          const parentGen = Math.round(item.parents.reduce((sum, p) => sum + p.gen, 0) / item.parents.length);
-          familyRows[parentGen] = (familyRows[parentGen] || 0) + 1;
-          item.lane = familyRows[parentGen] - 1;
+          const key = String(item.parentGen);
+          if (!laneTracker[key]) laneTracker[key] = [];
+
+          let chosenLane = 0;
+          while (true) {
+            const conflict = laneTracker[key].some(placed => {
+              if (placed.lane !== chosenLane) return false;
+              return !(item.rangeMaxX < placed.rangeMinX || item.rangeMinX > placed.rangeMaxX);
+            });
+            if (!conflict) break;
+            chosenLane += 1;
+          }
+
+          item.lane = chosenLane;
+          laneTracker[key].push({
+            lane: chosenLane,
+            rangeMinX: item.rangeMinX,
+            rangeMaxX: item.rangeMaxX,
+          });
         });
 
       familyItems.forEach(({ fam, parents, children, lane }) => {
@@ -674,8 +733,10 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
           ctx.lineTo(maxX, midY);
 
           sortedChildren.forEach(c => {
+            const childTopY = c.y - c.radius;
+            const elbowY = Math.min(childTopY - 10, midY + 18);
             ctx.moveTo(c.x, midY);
-            ctx.lineTo(c.x, c.y - c.radius);
+            ctx.quadraticCurveTo(c.x, elbowY, c.x, childTopY);
           });
         }
         ctx.stroke();
@@ -1055,31 +1116,53 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
     relationText: ''
   });
 
-  const linkNodes = (draft, id1, id2, relType) => {
+    const linkNodes = (draft, id1, id2, relType) => {
+      const addUnique = (arr, value) => {
+      if (!arr.includes(value)) arr.push(value);
+      };
+
+      const linkAsSpouse = (aId, bId) => {
+      if (!draft[aId] || !draft[bId] || aId === bId) return;
+      addUnique(draft[aId].spouses, bId);
+      addUnique(draft[bId].spouses, aId);
+      };
+
       let n1 = draft[id1]; let n2 = draft[id2];
       if (relType === 'parent') {
-          n2.children.push(id1); n1.parents.push(id2);
+        addUnique(n2.children, id1);
+        addUnique(n1.parents, id2);
+
+        // If the child already has another parent, auto-link co-parents as spouses.
+        n1.parents
+        .filter(pid => pid !== id2 && draft[pid])
+        .forEach(pid => linkAsSpouse(id2, pid));
       } else if (relType === 'child') {
-          n2.parents.push(id1); n1.children.push(id2);
-          if (n1.spouses.length > 0) {
-              let spId = n1.spouses[0];
-              n2.parents.push(spId); draft[spId].children.push(id2);
-          }
+        addUnique(n2.parents, id1);
+        addUnique(n1.children, id2);
+        if (n1.spouses.length > 0) {
+          let spId = n1.spouses[0];
+          addUnique(n2.parents, spId);
+          addUnique(draft[spId].children, id2);
+          linkAsSpouse(id1, spId);
+        }
       } else if (relType === 'spouse') {
-          n1.spouses.push(id2); n2.spouses.push(id1);
+        linkAsSpouse(id1, id2);
       } else if (relType === 'sibling') {
-          if (n1.parents.length === 0) {
-              let dummyF = generateId();
-              draft[dummyF] = { id: dummyF, name: '未知(父親)', gender: 'M', parents: [], children: [id1, id2], spouses: [], bio: '', posts: [], claimed: false };
-              n1.parents.push(dummyF); n2.parents.push(dummyF);
-          } else {
-              n1.parents.forEach(pid => {
-                  if(!draft[pid].children.includes(id2)) draft[pid].children.push(id2);
-                  n2.parents.push(pid);
-              });
-          }
+        if (n1.parents.length === 0) {
+          let dummyF = generateId();
+          draft[dummyF] = { id: dummyF, name: '未知(父親)', gender: 'M', parents: [], children: [id1, id2], spouses: [], bio: '', posts: [], claimed: false };
+          addUnique(n1.parents, dummyF);
+          addUnique(n2.parents, dummyF);
+        } else {
+          n1.parents.forEach(pid => {
+            if (draft[pid]) {
+            addUnique(draft[pid].children, id2);
+            addUnique(n2.parents, pid);
+            }
+          });
+        }
       }
-  };
+    };
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
