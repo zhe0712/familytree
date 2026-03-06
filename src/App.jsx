@@ -16,11 +16,15 @@ const INITIAL_MEMBERS = {
   'g1_m1': { id: 'g1_m1', name: '王天明', gender: 'M', birthday: '1942-03-15', parents: [], children: ['m1', 'g2_m2'], spouses: ['g1_f1'], bio: '家族開創者，當年白手起家。', posts: [], claimed: false },
   'g1_f1': { id: 'g1_f1', name: '李玉蘭', gender: 'F', birthday: '1945-08-02', parents: [], children: ['m1', 'g2_m2'], spouses: ['g1_m1'], bio: '溫柔堅毅，持家有道。', posts: [], claimed: false },
   'm1': { id: 'm1', name: '王大川', gender: 'M', birthday: '1968-01-20', parents: ['g1_m1', 'g1_f1'], children: ['m3', 'm4'], spouses: ['m2'], bio: '家族大家長，熱愛書法與園藝。', posts: [{ id: 'p1', date: '2025-10-10', text: '今天在後院種下了一棵櫻花樹，希望子孫滿堂。' }], claimed: true },
-  'm2': { id: 'm2', name: '林美麗', gender: 'F', birthday: '1970-11-05', parents: [], children: ['m3', 'm4'], spouses: ['m1'], bio: '慈祥的祖母，拿手好菜是紅燒肉。', posts: [], claimed: false },
+  'm2': { id: 'm2', name: '林美麗', gender: 'F', birthday: '1970-11-05', parents: ['wg_m', 'wg_f'], children: ['m3', 'm4'], spouses: ['m1'], bio: '慈祥的祖母，拿手好菜是紅燒肉。', posts: [], claimed: false },
+  'wg_m': { id: 'wg_m', name: '林國棟', gender: 'M', birthday: '1943-06-10', parents: [], children: ['m2'], spouses: ['wg_f'], bio: '退休公務員，喜歡下棋。', posts: [], claimed: false },
+  'wg_f': { id: 'wg_f', name: '張秀英', gender: 'F', birthday: '1946-12-25', parents: [], children: ['m2'], spouses: ['wg_m'], bio: '溫和慈祥，擅長裁縫。', posts: [], claimed: false },
   'g2_m2': { id: 'g2_m2', name: '王二川', gender: 'M', birthday: '1972-06-18', parents: ['g1_m1', 'g1_f1'], children: ['g3_m3'], spouses: ['g2_f2'], bio: '大川的弟弟，長居南部。', posts: [], claimed: false },
   'g2_f2': { id: 'g2_f2', name: '周惠', gender: 'F', birthday: '1974-04-12', parents: [], children: ['g3_m3'], spouses: ['g2_m2'], bio: '賢內助，廚藝極佳。', posts: [], claimed: false },
   'm3': { id: 'm3', name: '王建國', gender: 'M', birthday: '1993-05-09', parents: ['m1', 'm2'], children: ['m5', 'g4_f1'], spouses: ['m6'], bio: '長子，目前在科技業擔任工程師。', posts: [], claimed: true },
-  'm6': { id: 'm6', name: '陳淑芬', gender: 'F', birthday: '1994-09-21', parents: [], children: ['m5', 'g4_f1'], spouses: ['m3'], bio: '溫柔體貼，喜歡烹飪。', posts: [], claimed: false },
+  'm6': { id: 'm6', name: '陳淑芬', gender: 'F', birthday: '1994-09-21', parents: ['yf_m', 'yf_f'], children: ['m5', 'g4_f1'], spouses: ['m3'], bio: '溫柔體貼，喜歡烹飪。', posts: [], claimed: false },
+  'yf_m': { id: 'yf_m', name: '陳志明', gender: 'M', birthday: '1965-02-28', parents: [], children: ['m6'], spouses: ['yf_f'], bio: '經營小吃店，熱情豪爽。', posts: [], claimed: false },
+  'yf_f': { id: 'yf_f', name: '黃麗華', gender: 'F', birthday: '1967-07-14', parents: [], children: ['m6'], spouses: ['yf_m'], bio: '社區志工，樂於助人。', posts: [], claimed: false },
   'm4': { id: 'm4', name: '王心凌', gender: 'F', birthday: '1996-02-14', parents: ['m1', 'm2'], children: ['g4_m1'], spouses: ['g3_m1'], bio: '小女兒，自由撰稿人。', posts: [{ id: 'p2', date: '2026-01-05', text: '剛完成了一本新書的初稿！' }], claimed: false },
   'g3_m1': { id: 'g3_m1', name: '李大為', gender: 'M', birthday: '1992-12-01', parents: [], children: ['g4_m1'], spouses: ['m4'], bio: '攝影師，喜歡四處旅遊。', posts: [], claimed: false },
   'g3_m3': { id: 'g3_m3', name: '王志強', gender: 'M', birthday: '1995-07-30', parents: ['g2_m2', 'g2_f2'], children: ['g4_m2'], spouses: ['g3_f2'], bio: '建國的堂弟，從事貿易。', posts: [], claimed: false },
@@ -500,34 +504,29 @@ export default function App() {
     }
   };
 
-  // 匯出 JSON (包含族譜名稱與成員資料)
+  // 匯出 JSON (包含族譜名稱、成員資料及視角)
   const handleExportJSON = () => {
-    const exportData = { treeName, members };
+    const exportData = { treeName, members, meId };
     const jsonText = JSON.stringify(exportData, null, 2);
     const fileName = `${treeName}.json`;
     const blob = new Blob([jsonText], { type: 'application/json;charset=utf-8' });
 
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    // Detect mobile vs desktop
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-    // Prefer native share sheet on mobile if available.
-    if (navigator.share && typeof File !== 'undefined') {
+    // On mobile, prefer native share sheet if it supports files.
+    if (isMobile && navigator.share && typeof File !== 'undefined') {
       const file = new File([blob], fileName, { type: 'application/json' });
-      navigator.share({ files: [file], title: treeName, text: '族譜資料匯出' }).catch(() => {
-        // User cancelled share or browser rejected; continue with fallback.
-      });
-      return;
+      const shareData = { files: [file], title: treeName, text: '族譜資料匯出' };
+      if (navigator.canShare && navigator.canShare(shareData)) {
+        navigator.share(shareData).catch(() => { /* user cancelled */ });
+        return;
+      }
     }
 
+    // Desktop & fallback: direct file download
     const blobUrl = URL.createObjectURL(blob);
-
-    // iOS Safari may block/ignore download attribute; open a new tab as fallback.
-    if (isIOS) {
-      window.open(blobUrl, '_blank', 'noopener,noreferrer');
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
-      return;
-    }
-
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute('href', blobUrl);
     downloadAnchorNode.setAttribute('download', fileName);
@@ -537,7 +536,7 @@ export default function App() {
     setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
   };
 
-  // 載入 JSON (支援新版含名稱格式，與舊版純成員格式)
+  // 載入 JSON (支援新版含名稱/meId格式，與舊版純成員格式)
   const handleImportJSON = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -546,13 +545,18 @@ export default function App() {
       try {
         const json = JSON.parse(event.target.result);
         if (json.treeName && json.members) {
-           setTreeName(json.treeName);
-            setMembers(normalizeMembers(json.members));
+          setTreeName(json.treeName);
+          setMembers(normalizeMembers(json.members));
+          // 還原視角: 優先用存檔中的 meId，否則用第一位成員
+          const ids = Object.keys(json.members);
+          setMeId(json.meId && ids.includes(json.meId) ? json.meId : ids[0]);
         } else {
-           setTreeName('載入的族譜');
-            setMembers(normalizeMembers(json));
+          setTreeName('載入的族譜');
+          setMembers(normalizeMembers(json));
+          setMeId(Object.keys(json)[0]);
         }
-        setMeId(Object.keys(json.members || json)[0]); // 重設視角
+        setSelectedId(null);
+        setSuppressProfilePanel(false);
         setIsStartOpen(false);
       } catch (err) {
         alert("檔案格式錯誤，無法載入。");
@@ -890,9 +894,10 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
   const computeLayoutTargets = useCallback((engine, hiddenNodes) => {
     const { nodes, links, families } = engine;
     const rowSpacing = 230;
-    const colSpacing = 170;
-    const spouseGap = 130;
+    const unitGap = 160;    // gap between sibling units (child+spouse)
+    const spouseGap = 130;  // gap between spouses within a couple
 
+    // --- Mark hidden ---
     const genMap = new Map();
     nodes.forEach(n => {
       n.isHidden = hiddenNodes.has(n.id);
@@ -902,160 +907,310 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
       }
     });
 
-    const sortedGens = [...genMap.keys()].sort((a, b) => a - b);
+    const nodeById = {};
+    nodes.forEach(n => { nodeById[n.id] = n; });
 
-    // Helper: get family sort key — if no parents, borrow from spouse's parents
-    const getFamilyKey = (n) => {
-      if (n.data.parents.length) return [...n.data.parents].sort().join(',');
-      for (const sid of n.data.spouses) {
-        const sp = nodes.find(s => s.id === sid);
-        if (sp && sp.data.parents.length) return [...sp.data.parents].sort().join(',');
-      }
-      return n.id;
+    // --- Identify blood relatives vs married-in ---
+    // Blood = has parents OR is a root ancestor with children
+    const isBlood = (n) => {
+      if (n.data.parents.length > 0) return true;
+      // Root ancestors (no parents but have children) are blood
+      if (n.data.children.length > 0) return true;
+      return false;
     };
 
-    // Helper: get couple sort key — spouse pairs share the blood member's id
-    const getCoupleKey = (n) => {
-      if (n.data.parents.length) return n.id;
-      // Married-in: use blood spouse's id so they sort adjacent
-      for (const sid of n.data.spouses) {
-        const sp = nodes.find(s => s.id === sid);
-        if (sp && sp.data.parents.length) return sp.id;
-      }
-      return n.id;
+    // --- Build subtree width (bottom-up) ---
+    // A "unit" = blood member + their spouse(s). Units are the atomic positioning blocks.
+    // Width of a unit = spouseGap * numSpouses (or just one node width if no spouse)
+    // Width of a parent unit = max(own width, sum of children unit widths + gaps)
+
+    const unitWidth = {}; // id -> total width needed for this person's subtree
+
+    const getSpouses = (id) => {
+      const n = nodeById[id];
+      if (!n || n.isHidden) return [];
+      return (n.data.spouses || [])
+        .map(sid => nodeById[sid])
+        .filter(sp => sp && !sp.isHidden);
     };
 
-    sortedGens.forEach(gen => {
-      const row = genMap.get(gen);
-      row.sort((a, b) => {
-        // 1) Group by family (shared parents)
-        const aFamily = getFamilyKey(a);
-        const bFamily = getFamilyKey(b);
-        if (aFamily !== bFamily) return aFamily.localeCompare(bFamily);
-        // 2) Within family, group by couple (blood member + their spouse together)
-        const aCouple = getCoupleKey(a);
-        const bCouple = getCoupleKey(b);
-        if (aCouple !== bCouple) return aCouple.localeCompare(bCouple);
-        // 3) Within couple, blood member first
-        const aBlood = a.data.parents.length > 0 ? 0 : 1;
-        const bBlood = b.data.parents.length > 0 ? 0 : 1;
-        return aBlood - bBlood;
-      });
+    const getBloodChildren = (id) => {
+      const n = nodeById[id];
+      if (!n) return [];
+      // Children that are blood (have this node as parent)
+      // For each child, find their spouses to form units
+      return (n.data.children || [])
+        .map(cid => nodeById[cid])
+        .filter(c => c && !c.isHidden && c.data.parents.includes(id));
+    };
 
-      let cursor = -((row.length - 1) * colSpacing) / 2;
-      row.forEach(n => {
-        if (typeof n.targetX !== 'number') n.targetX = n.x;
-        n.targetX = cursor;
-        n.targetY = n.gen * rowSpacing;
-        cursor += colSpacing;
-      });
-    });
-
-    // Anchor children near their parent group center (BEFORE spouse snap).
+    // Deduplicate: children shared between two parents should only be counted once
+    // Use families to get unique child sets
+    const familyChildren = {}; // familyKey -> [childIds]
     families.forEach(fam => {
-      const parents = fam.parentIds.map(id => nodes.find(n => n.id === id)).filter(Boolean).filter(n => !n.isHidden);
-      const children = fam.childIds.map(id => nodes.find(n => n.id === id)).filter(Boolean).filter(n => !n.isHidden);
-      if (parents.length === 0 || children.length === 0) return;
+      const key = fam.id;
+      familyChildren[key] = fam.childIds.filter(cid => nodeById[cid] && !nodeById[cid].isHidden);
+    });
 
-      const parentCenterX = parents.reduce((sum, p) => sum + p.targetX, 0) / parents.length;
-      const childSpacing = 145;
-      const totalWidth = (children.length - 1) * childSpacing;
-      const left = parentCenterX - totalWidth / 2;
+    // Calculate unit width bottom-up
+    // Unit = person + spouse side by side. Subtree = unit + all descendant subtrees below.
+    const calcWidth = (id, visited) => {
+      if (visited.has(id)) return unitWidth[id] || spouseGap;
+      visited.add(id);
 
-      children
-        .slice()
-        .sort((a, b) => a.targetX - b.targetX)
-        .forEach((child, index) => {
-          child.targetX = left + index * childSpacing;
+      const n = nodeById[id];
+      if (!n || n.isHidden) { unitWidth[id] = 0; return 0; }
+
+      const spouses = getSpouses(id);
+      const ownWidth = spouses.length > 0 ? spouseGap * spouses.length : 0;
+
+      // Find children (unique, not double-counted between co-parents)
+      const childIds = [];
+      const seen = new Set();
+      (n.data.children || []).forEach(cid => {
+        if (!seen.has(cid) && nodeById[cid] && !nodeById[cid].isHidden) {
+          seen.add(cid);
+          childIds.push(cid);
+        }
+      });
+
+      // Only count children whose primary parent is this node
+      // (to avoid double counting between co-parents)
+      const myChildren = childIds.filter(cid => {
+        const c = nodeById[cid];
+        // Primary parent: the one with parents themselves, or first in list
+        const bloodParents = c.data.parents.filter(pid => nodeById[pid] && !nodeById[pid].isHidden && nodeById[pid].data.parents.length > 0);
+        if (bloodParents.length > 0) return bloodParents[0] === id;
+        return c.data.parents[0] === id;
+      });
+
+      if (myChildren.length === 0) {
+        unitWidth[id] = Math.max(ownWidth, spouseGap);
+        return unitWidth[id];
+      }
+
+      let childrenTotalWidth = 0;
+      myChildren.forEach((cid, i) => {
+        const cSpouses = getSpouses(cid);
+        const childSubtreeW = calcWidth(cid, visited);
+        // Each child unit includes the child + their spouses
+        const childUnitOwnW = cSpouses.length > 0 ? spouseGap * cSpouses.length : 0;
+        const childW = Math.max(childSubtreeW, childUnitOwnW, spouseGap);
+        childrenTotalWidth += childW;
+        if (i > 0) childrenTotalWidth += unitGap - spouseGap; // gap between child units
+      });
+
+      unitWidth[id] = Math.max(ownWidth, childrenTotalWidth, spouseGap);
+      return unitWidth[id];
+    };
+
+    // Find root nodes (topmost generation)
+    const sortedGens = [...genMap.keys()].sort((a, b) => a - b);
+    const visited = new Set();
+
+    // Calculate widths starting from root generation
+    if (sortedGens.length > 0) {
+      const rootGen = sortedGens[0];
+      const rootRow = genMap.get(rootGen) || [];
+      // Start from blood roots (not married-in)
+      const bloodRoots = rootRow.filter(n => isBlood(n));
+      const rootsToCalc = bloodRoots.length > 0 ? bloodRoots : rootRow;
+      rootsToCalc.forEach(n => calcWidth(n.id, visited));
+      // Also calc for any not yet visited
+      nodes.forEach(n => { if (!visited.has(n.id) && !n.isHidden) calcWidth(n.id, visited); });
+    }
+
+    // --- Top-down positioning ---
+    const positioned = new Set();
+
+    const positionSubtree = (id, centerX, gen) => {
+      const n = nodeById[id];
+      if (!n || n.isHidden || positioned.has(id)) return;
+      positioned.add(id);
+
+      n.targetX = centerX;
+      n.targetY = gen * rowSpacing;
+
+      // Place spouses
+      const spouses = getSpouses(id);
+      spouses.forEach((sp, i) => {
+        if (positioned.has(sp.id)) return;
+        positioned.add(sp.id);
+        sp.targetX = centerX + spouseGap * (i + 1);
+        sp.targetY = gen * rowSpacing;
+      });
+
+      // Adjust: center the couple
+      if (spouses.length > 0) {
+        const coupleWidth = spouseGap * spouses.length;
+        const coupleLeft = centerX - coupleWidth / 2;
+        n.targetX = coupleLeft;
+        spouses.forEach((sp, i) => {
+          sp.targetX = coupleLeft + spouseGap * (i + 1);
         });
-    });
-
-    // Keep spouse nodes adjacent with tight spacing (AFTER children anchoring).
-    links.forEach(link => {
-      if (link.type !== 'spouse') return;
-      const a = link.source;
-      const b = link.target;
-      if (a.isHidden || b.isHidden) return;
-      const centerX = (a.targetX + b.targetX) / 2;
-      a.targetX = centerX - spouseGap / 2;
-      b.targetX = centerX + spouseGap / 2;
-    });
-
-    // Final overlap resolver per generation — symmetric push to avoid drift.
-    sortedGens.forEach(gen => {
-      const row = (genMap.get(gen) || []).slice().sort((a, b) => a.targetX - b.targetX);
-      // Forward pass: push right when too close.
-      for (let i = 1; i < row.length; i++) {
-        const prev = row[i - 1];
-        const curr = row[i];
-        const isSpousePair = prev.data.spouses.includes(curr.id) || curr.data.spouses.includes(prev.id);
-        const minGap = isSpousePair ? 125 : 160;
-        const gap = curr.targetX - prev.targetX;
-        if (gap < minGap) {
-          const fix = (minGap - gap) / 2;
-          prev.targetX -= fix;
-          curr.targetX += fix;
-        }
       }
-      // Backward pass: propagate leftward adjustments.
-      for (let i = row.length - 2; i >= 0; i--) {
-        const curr = row[i];
-        const next = row[i + 1];
-        const isSpousePair = curr.data.spouses.includes(next.id) || next.data.spouses.includes(curr.id);
-        const minGap = isSpousePair ? 125 : 160;
-        const gap = next.targetX - curr.targetX;
-        if (gap < minGap) {
-          const fix = (minGap - gap) / 2;
-          curr.targetX -= fix;
-          next.targetX += fix;
+
+      // Position children
+      const childIds = [];
+      const seen = new Set();
+      (n.data.children || []).forEach(cid => {
+        if (!seen.has(cid) && nodeById[cid] && !nodeById[cid].isHidden && !positioned.has(cid)) {
+          // Only if this node is primary parent
+          const c = nodeById[cid];
+          const bloodParents = c.data.parents.filter(pid => nodeById[pid] && !nodeById[pid].isHidden && nodeById[pid].data.parents.length > 0);
+          const primaryParent = bloodParents.length > 0 ? bloodParents[0] : c.data.parents[0];
+          if (primaryParent === id) {
+            seen.add(cid);
+            childIds.push(cid);
+          }
         }
+      });
+
+      if (childIds.length === 0) return;
+
+      // Calculate each child's subtree width
+      const childWidths = childIds.map(cid => {
+        const cSpouses = getSpouses(cid);
+        const subtreeW = unitWidth[cid] || spouseGap;
+        const ownW = cSpouses.length > 0 ? spouseGap * cSpouses.length : 0;
+        return Math.max(subtreeW, ownW, spouseGap);
+      });
+
+      const totalChildrenWidth = childWidths.reduce((s, w) => s + w, 0) + (childIds.length - 1) * (unitGap - spouseGap);
+
+      // Center the couple pair
+      const coupleCenterX = spouses.length > 0
+        ? (n.targetX + spouses[spouses.length - 1].targetX) / 2
+        : centerX;
+
+      let childCursor = coupleCenterX - totalChildrenWidth / 2;
+
+      childIds.forEach((cid, i) => {
+        const w = childWidths[i];
+        const childCenterX = childCursor + w / 2;
+        positionSubtree(cid, childCenterX, gen + 1);
+        childCursor += w + (unitGap - spouseGap);
+      });
+    };
+
+    // Position from roots
+    if (sortedGens.length > 0) {
+      const rootGen = sortedGens[0];
+      const rootRow = genMap.get(rootGen) || [];
+      const bloodRoots = rootRow.filter(n => isBlood(n) && !positioned.has(n.id));
+
+      // Calculate total width of all root subtrees
+      const rootWidths = bloodRoots.map(n => unitWidth[n.id] || spouseGap);
+      const totalRootWidth = rootWidths.reduce((s, w) => s + w, 0) + Math.max(0, (bloodRoots.length - 1)) * unitGap;
+
+      let cursor = -totalRootWidth / 2;
+      bloodRoots.forEach((n, i) => {
+        const w = rootWidths[i];
+        positionSubtree(n.id, cursor + w / 2, rootGen);
+        cursor += w + unitGap;
+      });
+    }
+
+    // --- Position remaining unpositioned nodes (in-law parents, disconnected) ---
+    // Phase A: unpositioned "parent couples" whose children are already positioned
+    //          → place them as a couple to the right of the main tree
+    const unpositioned = nodes.filter(n => !n.isHidden && !positioned.has(n.id));
+    const handled = new Set();
+    const parentFamilies = [];
+
+    unpositioned.forEach(n => {
+      if (handled.has(n.id)) return;
+      const posChildIds = (n.data.children || []).filter(cid => positioned.has(cid));
+      if (posChildIds.length === 0) return;
+
+      const familyMembers = [n.id];
+      handled.add(n.id);
+      (n.data.spouses || []).forEach(sid => {
+        if (!positioned.has(sid) && !handled.has(sid) && nodeById[sid]) {
+          familyMembers.push(sid);
+          handled.add(sid);
+        }
+      });
+      const childCenterX = posChildIds.reduce((s, cid) => s + nodeById[cid].targetX, 0) / posChildIds.length;
+      parentFamilies.push({ members: familyMembers, childCenterX });
+    });
+
+    // Find the rightmost positioned node to place secondary families beyond it
+    let maxPositionedX = -Infinity;
+    nodes.forEach(n => {
+      if (positioned.has(n.id) && !n.isHidden && n.targetX > maxPositionedX) maxPositionedX = n.targetX;
+    });
+    if (!isFinite(maxPositionedX)) maxPositionedX = 0;
+
+    let secondaryCursor = maxPositionedX + unitGap * 1.5;
+    parentFamilies.forEach(fam => {
+      const mems = fam.members;
+      const cx = secondaryCursor;
+      mems.forEach((mid, i) => {
+        const mn = nodeById[mid];
+        positioned.add(mid);
+        mn.targetX = cx + i * spouseGap - ((mems.length - 1) * spouseGap) / 2;
+        mn.targetY = mn.gen * rowSpacing;
+      });
+      secondaryCursor += mems.length * spouseGap + unitGap;
+    });
+
+    // Phase B: unpositioned spouses of positioned nodes → snap next to spouse
+    nodes.forEach(n => {
+      if (n.isHidden || positioned.has(n.id)) return;
+      const posSpouseId = (n.data.spouses || []).find(sid => positioned.has(sid));
+      if (posSpouseId) {
+        const sp = nodeById[posSpouseId];
+        n.targetX = sp.targetX + spouseGap;
+        n.targetY = sp.targetY;
+        positioned.add(n.id);
       }
     });
 
-    // Eject any outsider node sitting between a spouse pair.
-    const spousePairs = [];
-    links.forEach(link => {
-      if (link.type !== 'spouse') return;
-      const a = link.source;
-      const b = link.target;
-      if (a.isHidden || b.isHidden) return;
-      spousePairs.push([a, b]);
+    // Phase C: anything truly disconnected
+    nodes.forEach(n => {
+      if (n.isHidden || positioned.has(n.id)) return;
+      n.targetX = secondaryCursor;
+      n.targetY = n.gen * rowSpacing;
+      secondaryCursor += unitGap;
+      positioned.add(n.id);
     });
 
+    // --- Final overlap fix (light pass, never splits couples) ---
     sortedGens.forEach(gen => {
-      const row = (genMap.get(gen) || []).slice().sort((a, b) => a.targetX - b.targetX);
-      let changed = true;
-      let iterations = 0;
-      while (changed && iterations < 10) {
-        changed = false;
-        iterations++;
-        for (const [sa, sb] of spousePairs) {
-          if (sa.gen !== gen) continue;
-          const leftSpouse = sa.targetX < sb.targetX ? sa : sb;
-          const rightSpouse = sa.targetX < sb.targetX ? sb : sa;
-          const lo = leftSpouse.targetX;
-          const hi = rightSpouse.targetX;
-          for (const n of row) {
-            if (n === sa || n === sb) continue;
-            if (n.targetX > lo && n.targetX < hi) {
-              // Outsider is between the spouse pair — push to nearest side
-              const distToLeft = n.targetX - lo;
-              const distToRight = hi - n.targetX;
-              if (distToLeft <= distToRight) {
-                n.targetX = lo - 160;
+      const row = (genMap.get(gen) || []).filter(n => !n.isHidden).sort((a, b) => a.targetX - b.targetX);
+      for (let pass = 0; pass < 5; pass++) {
+        for (let i = 1; i < row.length; i++) {
+          const prev = row[i - 1], curr = row[i];
+          const isCouple = prev.data.spouses.includes(curr.id) || curr.data.spouses.includes(prev.id);
+          const minGap = isCouple ? 120 : 145;
+          const gap = curr.targetX - prev.targetX;
+          if (gap < minGap) {
+            // If one of them is part of a couple with its neighbour, push the outsider away
+            const fix = minGap - gap;
+            if (isCouple) {
+              // Couple too close — symmetric push
+              prev.targetX -= fix / 2;
+              curr.targetX += fix / 2;
+            } else {
+              // Non-couple overlap — push the one that is further from a coupled partner outward
+              const prevIsCoupled = i >= 2 && (row[i - 2].data.spouses.includes(prev.id) || prev.data.spouses.includes(row[i - 2].id));
+              const currIsCoupled = i + 1 < row.length && (curr.data.spouses.includes(row[i + 1].id) || row[i + 1].data.spouses.includes(curr.id));
+              if (prevIsCoupled && !currIsCoupled) {
+                curr.targetX += fix;
+              } else if (!prevIsCoupled && currIsCoupled) {
+                prev.targetX -= fix;
               } else {
-                n.targetX = hi + 160;
+                prev.targetX -= fix / 2;
+                curr.targetX += fix / 2;
               }
-              changed = true;
             }
           }
         }
-        // Re-sort row after moves
-        row.sort((a, b) => a.targetX - b.targetX);
       }
     });
 
-    // Hidden nodes collapse toward nearest parent to keep transitions smooth.
+    // --- Hidden nodes collapse toward parent ---
     nodes.forEach(n => {
       if (!n.isHidden) return;
       const parent = nodes.find(p => n.data.parents.includes(p.id));
