@@ -35,6 +35,21 @@ const INITIAL_MEMBERS = {
   'g5_f1': { id: 'g5_f1', name: '林芸', gender: 'F', parents: ['g4_f1', 'g4_m3'], children: [], spouses: [], bio: '小學一年級。', posts: [], claimed: false },
 };
 
+const LOCAL_STORAGE_KEY = 'familytree.autosave.v1';
+
+const readSavedTree = () => {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.treeName || !parsed.members || !parsed.meId) return null;
+    if (typeof parsed.members !== 'object' || Object.keys(parsed.members).length === 0) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
 // ==========================================
 // 2. 稱謂計算系統 (Kinship Calculator)
 // ==========================================
@@ -103,12 +118,14 @@ export default function App() {
   const [searchFocusKey, setSearchFocusKey] = useState(0);
   const [searchHighlightId, setSearchHighlightId] = useState(null);
   const [suppressProfilePanel, setSuppressProfilePanel] = useState(false);
+  const [hasSavedLocalData, setHasSavedLocalData] = useState(false);
   
   const [isQAOpen, setIsQAOpen] = useState(false);
   const [qaContext, setQaContext] = useState(null); 
   const [isQROpen, setIsQROpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false); 
   const fileInputRef = useRef(null);
+  const savedTreeRef = useRef(null);
 
   const selectedMember = selectedId ? members[selectedId] : null;
   const searchResults = useMemo(() => {
@@ -125,6 +142,30 @@ export default function App() {
     const timer = setTimeout(() => setSearchHighlightId(null), 4000);
     return () => clearTimeout(timer);
   }, [searchHighlightId]);
+
+  useEffect(() => {
+    const saved = readSavedTree();
+    if (!saved) return;
+    savedTreeRef.current = saved;
+    setHasSavedLocalData(true);
+  }, []);
+
+  useEffect(() => {
+    if (isStartOpen) return;
+    try {
+      const payload = {
+        treeName,
+        members,
+        meId,
+        updatedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
+      savedTreeRef.current = payload;
+      setHasSavedLocalData(true);
+    } catch {
+      // Ignore localStorage write errors (quota/privacy mode).
+    }
+  }, [treeName, members, meId, isStartOpen]);
 
   const handleUpdateMembers = (newMembersMap, targetId) => {
     setMembers(newMembersMap);
@@ -198,6 +239,30 @@ export default function App() {
   const handleCanvasSelect = (id) => {
     setSuppressProfilePanel(false);
     setSelectedId(id);
+  };
+
+  const handleLoadLastData = () => {
+    const saved = savedTreeRef.current || readSavedTree();
+    if (!saved) {
+      alert('找不到上次資料。');
+      return;
+    }
+    setTreeName(saved.treeName);
+    setMembers(saved.members);
+    setMeId(saved.meId);
+    setSelectedId(null);
+    setSuppressProfilePanel(false);
+    setIsStartOpen(false);
+  };
+
+  const handleClearSavedData = () => {
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+    } catch {
+      // Ignore localStorage errors.
+    }
+    savedTreeRef.current = null;
+    setHasSavedLocalData(false);
   };
 
   // 匯出 JSON (包含族譜名稱與成員資料)
@@ -466,6 +531,9 @@ export default function App() {
             setSelectedId(null);
             setIsStartOpen(false);
           }}
+          hasSavedData={hasSavedLocalData}
+          onLoadLastData={handleLoadLastData}
+          onClearSavedData={handleClearSavedData}
         />
       )}
 
@@ -1477,7 +1545,7 @@ const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRel
   );
 };
 
-const StartModal = ({ onCreate, onLoadTemplate }) => {
+const StartModal = ({ onCreate, onLoadTemplate, hasSavedData, onLoadLastData, onClearSavedData }) => {
   return (
     <div className="fixed inset-0 bg-gray-900/75 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 md:p-8 border border-gray-100">
@@ -1493,6 +1561,22 @@ const StartModal = ({ onCreate, onLoadTemplate }) => {
           >
             建立新族譜
           </button>
+          {hasSavedData && (
+            <>
+              <button
+                onClick={onLoadLastData}
+                className="w-full py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold hover:bg-amber-100 transition"
+              >
+                載入上次資料
+              </button>
+              <button
+                onClick={onClearSavedData}
+                className="w-full py-3 rounded-xl bg-white border border-red-200 text-red-600 font-bold hover:bg-red-50 transition"
+              >
+                清除上次資料
+              </button>
+            </>
+          )}
           <button
             onClick={onLoadTemplate}
             className="w-full py-3 rounded-xl bg-white border border-emerald-200 text-emerald-700 font-bold hover:bg-emerald-50 transition"
