@@ -1343,15 +1343,28 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
           return;
         }
 
-        n.vx = n.vx * 0.72 + (n.targetX - n.x) * 0.16;
-        n.vy = n.vy * 0.72 + (n.targetY - n.y) * 0.16;
+        n.vx = n.vx * 0.78 + (n.targetX - n.x) * 0.13;
+        n.vy = n.vy * 0.78 + (n.targetY - n.y) * 0.13;
         n.x += n.vx;
         n.y += n.vy;
+
+        // Snap to target when almost settled to prevent micro-jitter.
+        if (
+          Math.abs(n.targetX - n.x) < 0.35
+          && Math.abs(n.targetY - n.y) < 0.35
+          && Math.abs(n.vx) < 0.2
+          && Math.abs(n.vy) < 0.2
+        ) {
+          n.x = n.targetX;
+          n.y = n.targetY;
+          n.vx = 0;
+          n.vy = 0;
+        }
       });
 
       // Visible node collision pass.
       const visibleNodes = nodes.filter(n => !n.isHidden);
-      for (let pass = 0; pass < 2; pass++) {
+      for (let pass = 0; pass < 1; pass++) {
         for (let i = 0; i < visibleNodes.length; i++) {
           for (let j = i + 1; j < visibleNodes.length; j++) {
             const a = visibleNodes[i];
@@ -1373,10 +1386,10 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
               const overlap = minDist - dist;
               const nx = dx / dist;
               const ny = dy / dist;
-              a.x -= nx * overlap * 0.5;
-              a.y -= ny * overlap * 0.3;
-              b.x += nx * overlap * 0.5;
-              b.y += ny * overlap * 0.3;
+              a.x -= nx * overlap * 0.35;
+              a.y -= ny * overlap * 0.22;
+              b.x += nx * overlap * 0.35;
+              b.y += ny * overlap * 0.22;
             }
           }
         }
