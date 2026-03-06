@@ -182,6 +182,30 @@ const resolveAgeAwareKinship = (fromId, toId, members, path) => {
     }
   }
 
+  // 兄弟的妻子 (嫂嫂/弟妹)、姊妹的丈夫 (姊夫/妹夫)
+  if (path.length === 3 && (path[0] === 'F' || path[0] === 'M') && (path[1] === 'S' || path[1] === 'D') && (path[2] === 'W' || path[2] === 'H')) {
+    // 找到中間的兄弟姊妹：to 的配偶中，跟 from 共享父母的那個
+    const sibling = (to.spouses || []).map(sid => members[sid]).find(sp => sp && (from.parents || []).some(pid => (sp.parents || []).includes(pid)));
+    if (sibling) {
+      const isOlderThanMe = compareBirthdayOrder(sibling.birthday, from.birthday);
+      if (path[1] === 'S' && path[2] === 'W') return getOlderLabel(isOlderThanMe, '嫂嫂', '弟妹', '嫂嫂/弟妹');
+      if (path[1] === 'D' && path[2] === 'H') return getOlderLabel(isOlderThanMe, '姊夫', '妹夫', '姊夫/妹夫');
+    }
+  }
+
+  // 伯母/嬸嬸 (伯伯叔叔的妻子)、姑丈、舅媽、姨丈
+  if (path.length === 4 && (path[0] === 'F' || path[0] === 'M') && (path[1] === 'F' || path[1] === 'M') && (path[2] === 'S' || path[2] === 'D') && (path[3] === 'W' || path[3] === 'H')) {
+    const uncle = (to.spouses || []).map(sid => members[sid]).find(Boolean);
+    if (path[0] === 'F' && path[2] === 'S' && path[3] === 'W' && uncle) {
+      const referenceParent = (from.parents || []).find(pid => members[pid] && members[pid].gender === 'M');
+      const isOlderThanParent = referenceParent ? compareBirthdayOrder(uncle.birthday, members[referenceParent].birthday) : null;
+      return getOlderLabel(isOlderThanParent, '伯母', '嬸嬸', '伯母/嬸嬸');
+    }
+    if (path[0] === 'F' && path[2] === 'D' && path[3] === 'H') return '姑丈';
+    if (path[0] === 'M' && path[2] === 'S' && path[3] === 'W') return '舅媽';
+    if (path[0] === 'M' && path[2] === 'D' && path[3] === 'H') return '姨丈';
+  }
+
   // 堂/表 + 哥弟姊妹
   if (path.length >= 4 && (path[path.length - 1] === 'S' || path[path.length - 1] === 'D')) {
     const cousinType = getCousinTypeByPath(path);
@@ -207,17 +231,27 @@ const translatePath = (path, targetGender) => {
   const map = {
     'F': '父親', 'M': '母親', 'S': '兒子', 'D': '女兒', 'H': '丈夫', 'W': '妻子',
     'F,F': '祖父(爺爺)', 'F,M': '祖母(奶奶)', 'M,F': '外祖父(外公)', 'M,M': '外祖母(外婆)',
-    'F,F,F': '曾祖父', 'F,F,M': '曾祖母', 'M,M,M': '外曾祖母', 'M,M,F': '外曾祖父',
-    'F,M,F': '外曾祖父', 'F,M,M': '外曾祖母', 
+    'F,F,F': '曾祖父', 'F,F,M': '曾祖母', 'F,M,F': '曾祖父', 'F,M,M': '曾祖母',
+    'M,F,F': '外曾祖父', 'M,F,M': '外曾祖母', 'M,M,F': '外曾祖父', 'M,M,M': '外曾祖母',
     'F,S': '兄弟', 'M,S': '兄弟', 'F,D': '姊妹', 'M,D': '姊妹',
     'F,F,S': '伯伯/叔叔', 'F,M,S': '伯伯/叔叔', 'F,F,D': '姑姑', 'F,M,D': '姑姑',
     'M,F,S': '舅舅', 'M,M,S': '舅舅', 'M,F,D': '阿姨', 'M,M,D': '阿姨',
     'F,S,S': '姪子', 'M,S,S': '姪子', 'F,S,D': '姪女', 'M,S,D': '姪女',
     'F,D,S': '外甥', 'M,D,S': '外甥', 'F,D,D': '外甥女', 'M,D,D': '外甥女',
     'S,S': '孫子', 'S,D': '孫女', 'D,S': '外孫', 'D,D': '外孫女',
-    'S,S,S': '曾孫', 'S,S,D': '曾孫女', 'D,S,S': '外曾孫', 'D,D,D': '外曾孫女',
+    'S,W': '媳婦', 'D,H': '女婿',
+    'S,S,S': '曾孫', 'S,S,D': '曾孫女', 'S,D,S': '曾孫', 'S,D,D': '曾孫女',
+    'D,S,S': '外曾孫', 'D,S,D': '外曾孫女', 'D,D,S': '外曾孫', 'D,D,D': '外曾孫女',
+    'S,S,W': '孫媳婦', 'S,D,H': '孫女婿', 'D,S,W': '外孫媳婦', 'D,D,H': '外孫女婿',
     'H,F': '公公', 'H,M': '婆婆', 'W,F': '岳父', 'W,M': '岳母',
     'H,S': '繼子', 'W,S': '繼子', 'H,D': '繼女', 'W,D': '繼女',
+    'F,S,W': '嫂嫂/弟妹', 'F,D,H': '姊夫/妹夫', 'M,S,W': '嫂嫂/弟妹', 'M,D,H': '姊夫/妹夫',
+    'H,F,S': '大伯/小叔', 'H,M,S': '大伯/小叔', 'H,F,D': '大姑/小姑', 'H,M,D': '大姑/小姑',
+    'W,F,S': '大舅子/小舅子', 'W,M,S': '大舅子/小舅子', 'W,F,D': '大姨子/小姨子', 'W,M,D': '大姨子/小姨子',
+    'F,F,S,W': '伯母/嬸嬸', 'F,M,S,W': '伯母/嬸嬸', 'F,F,D,H': '姑丈', 'F,M,D,H': '姑丈',
+    'M,F,S,W': '舅媽', 'M,M,S,W': '舅媽', 'M,F,D,H': '姨丈', 'M,M,D,H': '姨丈',
+    'F,S,S,W': '姪媳婦', 'F,S,D,H': '姪女婿', 'M,S,S,W': '姪媳婦', 'M,S,D,H': '姪女婿',
+    'F,D,S,W': '外甥媳婦', 'F,D,D,H': '外甥女婿', 'M,D,S,W': '外甥媳婦', 'M,D,D,H': '外甥女婿',
   };
   if (map[p]) return map[p];
 
