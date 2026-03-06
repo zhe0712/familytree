@@ -95,6 +95,7 @@ export default function App() {
   const [members, setMembers] = useState(INITIAL_MEMBERS);
   const [meId, setMeId] = useState('m3');
   const [selectedId, setSelectedId] = useState(null);
+  const [isStartOpen, setIsStartOpen] = useState(true);
   
   const [isQAOpen, setIsQAOpen] = useState(false);
   const [qaContext, setQaContext] = useState(null); 
@@ -112,6 +113,46 @@ export default function App() {
 
   const handleUpdateMember = (id, updates) => {
     setMembers(prev => ({ ...prev, [id]: { ...prev[id], ...updates } }));
+  };
+
+  const handleDeleteMember = (id) => {
+    if (!members[id]) return;
+    if (Object.keys(members).length <= 1) {
+      alert('至少需要保留一位成員。');
+      return;
+    }
+
+    const toDelete = new Set([id]);
+    const queue = [id];
+    while (queue.length > 0) {
+      const currentId = queue.shift();
+      const current = members[currentId];
+      if (!current) continue;
+      current.children.forEach(cid => {
+        if (!toDelete.has(cid)) {
+          toDelete.add(cid);
+          queue.push(cid);
+        }
+      });
+    }
+
+    if (toDelete.size >= Object.keys(members).length) {
+      alert('刪除後將沒有成員，請至少保留一位成員。');
+      return;
+    }
+
+    const draft = JSON.parse(JSON.stringify(members));
+    Object.values(draft).forEach(m => {
+      m.parents = m.parents.filter(pid => !toDelete.has(pid));
+      m.children = m.children.filter(cid => !toDelete.has(cid));
+      m.spouses = m.spouses.filter(sid => !toDelete.has(sid));
+    });
+    toDelete.forEach(delId => delete draft[delId]);
+
+    const nextIds = Object.keys(draft);
+    if (selectedId && toDelete.has(selectedId)) setSelectedId(null);
+    if (meId && toDelete.has(meId)) setMeId(nextIds[0] || null);
+    setMembers(draft);
   };
 
   const handleAddPost = (text) => {
@@ -148,6 +189,7 @@ export default function App() {
            setMembers(json);
         }
         setMeId(Object.keys(json.members || json)[0]); // 重設視角
+        setIsStartOpen(false);
       } catch (err) {
         alert("檔案格式錯誤，無法載入。");
       }
@@ -215,14 +257,14 @@ export default function App() {
         {/* 快速新增按鈕：手機版改為右下角懸浮 (Floating Action Button) */}
         <button 
           onClick={() => { setQaContext({ relativeId: selectedId || meId, relationType: 'child' }); setIsQAOpen(true); }}
-          className="absolute bottom-6 right-6 md:top-4 md:bottom-auto md:right-4 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl md:shadow-lg rounded-full md:rounded-2xl p-4 md:px-5 md:py-3 flex items-center gap-2 pointer-events-auto transition-transform hover:scale-105 z-20"
+          className={`absolute bottom-6 left-6 md:left-auto md:bottom-4 md:top-auto ${selectedMember ? 'md:right-[25rem]' : 'md:right-4'} bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl md:shadow-lg rounded-full md:rounded-2xl p-4 md:px-5 md:py-3 flex items-center gap-2 pointer-events-auto transition-transform hover:scale-105 z-40`}
         >
           <UserPlus size={24} className="md:w-5 md:h-5" />
           <span className="font-semibold hidden md:inline">快速新增</span>
         </button>
       </div>
 
-      <div className={`w-full sm:w-96 bg-white shadow-2xl z-30 flex flex-col transition-transform duration-500 ease-in-out absolute right-0 h-full ${selectedMember ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`w-[92vw] sm:w-96 bg-white shadow-2xl z-30 flex flex-col transition-transform duration-500 ease-in-out absolute right-0 h-full ${selectedMember ? 'translate-x-0' : 'translate-x-full'}`}>
         {selectedMember && (
           <ProfilePanel 
             member={selectedMember} 
@@ -232,6 +274,7 @@ export default function App() {
             onShowQR={() => setIsQROpen(true)}
             onAddPost={handleAddPost}
             onUpdateMember={handleUpdateMember}
+            onDeleteMember={handleDeleteMember}
           />
         )}
       </div>
@@ -269,7 +312,24 @@ export default function App() {
             setMembers({ [newId]: newMember });
             setMeId(newId);
             setSelectedId(newId);
+            setIsStartOpen(false);
             setIsResetOpen(false);
+          }}
+        />
+      )}
+
+      {isStartOpen && (
+        <StartModal
+          onCreate={() => {
+            setIsStartOpen(false);
+            setIsResetOpen(true);
+          }}
+          onLoadTemplate={() => {
+            setTreeName('王家大族譜');
+            setMembers(INITIAL_MEMBERS);
+            setMeId('m3');
+            setSelectedId(null);
+            setIsStartOpen(false);
           }}
         />
       )}
@@ -966,7 +1026,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId }) => {
 // ==========================================
 // 5. 側邊欄 - 個人資料面板
 // ==========================================
-const ProfilePanel = ({ member, kinship, onClose, onAddRelative, onShowQR, onAddPost, onUpdateMember }) => {
+const ProfilePanel = ({ member, kinship, onClose, onAddRelative, onShowQR, onAddPost, onUpdateMember, onDeleteMember }) => {
   const [postText, setPostText] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(member.name);
@@ -1043,6 +1103,15 @@ const ProfilePanel = ({ member, kinship, onClose, onAddRelative, onShowQR, onAdd
             <button onClick={() => onAddRelative('child')} className="py-2 border border-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm font-medium">子女</button>
             <button onClick={() => onAddRelative('sibling')} className="py-2 border border-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm font-medium">兄弟姊妹</button>
           </div>
+          <button
+            onClick={() => {
+              const ok = window.confirm(`確定要刪除「${member.name}」及其所有後代嗎？此操作無法復原。`);
+              if (ok) onDeleteMember(member.id);
+            }}
+            className="w-full mt-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm font-semibold"
+          >
+            刪除此人物與後代
+          </button>
         </div>
 
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
@@ -1091,6 +1160,34 @@ const ProfilePanel = ({ member, kinship, onClose, onAddRelative, onShowQR, onAdd
                <Edit3 size={18} />
              </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StartModal = ({ onCreate, onLoadTemplate }) => {
+  return (
+    <div className="fixed inset-0 bg-gray-900/75 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 md:p-8 border border-gray-100">
+        <h2 className="text-2xl font-black text-gray-800">歡迎使用 Family Tree</h2>
+        <p className="mt-2 text-sm text-gray-500 leading-relaxed">
+          請先選擇要從空白建立新族譜，或直接載入系統範本開始編輯。
+        </p>
+
+        <div className="mt-6 grid gap-3">
+          <button
+            onClick={onCreate}
+            className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition"
+          >
+            建立新族譜
+          </button>
+          <button
+            onClick={onLoadTemplate}
+            className="w-full py-3 rounded-xl bg-white border border-emerald-200 text-emerald-700 font-bold hover:bg-emerald-50 transition"
+          >
+            載入範本
+          </button>
         </div>
       </div>
     </div>
