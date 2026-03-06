@@ -953,6 +953,7 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
     sortedGens.forEach(gen => {
       const row = (genMap.get(gen) || []).filter(n => !n.isHidden);
       if (row.length === 0) return;
+      const rowAnchor = row.reduce((sum, n) => sum + n.targetX, 0) / row.length;
 
       const rowSet = new Set(row.map(n => n.id));
       const rowById = new Map(row.map(n => [n.id, n]));
