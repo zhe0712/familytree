@@ -162,7 +162,14 @@ const resolveAgeAwareKinship = (fromId, toId, members, path) => {
   if (siblingKinship) return siblingKinship;
 
   // 伯/叔、姑媽/姑姑、大舅/小舅、姨媽/阿姨
-  if (path.length === 3 && (path[2] === 'S' || path[2] === 'D') && (path[0] === 'F' || path[0] === 'M')) {
+  // Only treat as uncle/aunt when the middle step is grandparent (F/M),
+  // not sibling (S/D). This avoids misclassifying 「妹妹的兒子」.
+  if (
+    path.length === 3
+    && (path[2] === 'S' || path[2] === 'D')
+    && (path[0] === 'F' || path[0] === 'M')
+    && (path[1] === 'F' || path[1] === 'M')
+  ) {
     const referenceParent = (from.parents || []).find(pid => members[pid] && (path[0] === 'F' ? members[pid].gender === 'M' : members[pid].gender === 'F'));
     const isOlderThanParent = referenceParent ? compareBirthdayOrder(to.birthday, members[referenceParent].birthday) : null;
 
@@ -892,8 +899,9 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
         : 0;
       let cursor = rowAnchor - ((row.length - 1) * colSpacing) / 2;
       row.forEach(n => {
-        if (typeof n.targetX !== 'number') n.targetX = n.x;
-        n.targetX = cursor;
+        if (typeof n.targetX !== 'number') {
+          n.targetX = cursor;
+        }
         n.targetY = n.gen * rowSpacing;
         cursor += colSpacing;
       });
