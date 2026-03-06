@@ -1145,6 +1145,34 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
           node.targetX = maxX + 40 + index * 120;
         });
       });
+
+      // Final sweep: guarantee minimum horizontal spacing between all nodes in this row.
+      // This prevents the layout itself from placing targets that the collision system
+      // would then fight against the springs to resolve — the root cause of jitter.
+      const minNodeDist = 150;
+      const sorted = row.slice().sort((a, b) => a.targetX - b.targetX);
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = sorted[i - 1];
+        const curr = sorted[i];
+        // Spouses are allowed to be closer.
+        if (prev.data.spouses.includes(curr.id)) continue;
+        const gap = curr.targetX - prev.targetX;
+        if (gap < minNodeDist) {
+          const fix = (minNodeDist - gap) / 2;
+          curr.targetX += fix;
+          prev.targetX -= fix;
+          // Propagate leftward to maintain spacing with earlier nodes.
+          for (let k = i - 1; k >= 1; k--) {
+            const a = sorted[k - 1];
+            const b = sorted[k];
+            if (a.data.spouses.includes(b.id)) continue;
+            const g = b.targetX - a.targetX;
+            if (g < minNodeDist) {
+              a.targetX = b.targetX - minNodeDist;
+            } else break;
+          }
+        }
+      }
     });
 
     // Hidden nodes collapse toward nearest parent to keep transitions smooth.
