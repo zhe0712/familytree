@@ -1976,21 +1976,46 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
         addUnique(n2.children, id1);
         addUnique(n1.parents, id2);
 
-        // If the child already has another parent, auto-link co-parents as spouses.
+        // Auto-link co-parents as spouses.
         n1.parents
-        .filter(pid => pid !== id2 && draft[pid])
-        .forEach(pid => linkAsSpouse(id2, pid));
+          .filter(pid => pid !== id2 && draft[pid])
+          .forEach(pid => linkAsSpouse(id2, pid));
+
+        // New parent also becomes parent of existing siblings (children who share the same other parent).
+        n1.parents.filter(pid => pid !== id2 && draft[pid]).forEach(coParentId => {
+          (draft[coParentId].children || []).forEach(sibId => {
+            if (sibId !== id1 && draft[sibId]) {
+              addUnique(draft[sibId].parents, id2);
+              addUnique(n2.children, sibId);
+            }
+          });
+        });
       } else if (relType === 'child') {
         addUnique(n2.parents, id1);
         addUnique(n1.children, id2);
-        if (n1.spouses.length > 0) {
-          let spId = n1.spouses[0];
-          addUnique(n2.parents, spId);
-          addUnique(draft[spId].children, id2);
-          linkAsSpouse(id1, spId);
-        }
+        // All spouses of n1 also become parents of the new child.
+        (n1.spouses || []).forEach(spId => {
+          if (draft[spId]) {
+            addUnique(n2.parents, spId);
+            addUnique(draft[spId].children, id2);
+          }
+        });
       } else if (relType === 'spouse') {
         linkAsSpouse(id1, id2);
+        // 新配偶自動成為現有子女的父/母
+        (n1.children || []).forEach(cid => {
+          if (draft[cid]) {
+            addUnique(draft[cid].parents, id2);
+            addUnique(n2.children, cid);
+          }
+        });
+        // 反向：n2 的現有子女也關聯到 n1
+        (n2.children || []).forEach(cid => {
+          if (draft[cid] && !n1.children.includes(cid)) {
+            addUnique(draft[cid].parents, id1);
+            addUnique(n1.children, cid);
+          }
+        });
       } else if (relType === 'sibling') {
         if (n1.parents.length === 0) {
           let dummyF = generateId();
@@ -2000,8 +2025,8 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
         } else {
           n1.parents.forEach(pid => {
             if (draft[pid]) {
-            addUnique(draft[pid].children, id2);
-            addUnique(n2.parents, pid);
+              addUnique(draft[pid].children, id2);
+              addUnique(n2.parents, pid);
             }
           });
         }
