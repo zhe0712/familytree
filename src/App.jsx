@@ -2465,6 +2465,12 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
               else if (['妹夫'].includes(step)) { steps.splice(i, 1, '妹妹', '老公'); i--; continue; }
               else if (['媳婦'].includes(step)) { steps.splice(i, 1, '兒子', '老婆'); i--; continue; }
               else if (['女婿'].includes(step)) { steps.splice(i, 1, '女兒', '老公'); i--; continue; }
+              else if (['大舅子', '小舅子', '舅子', '內兄', '內弟'].includes(step)) { steps.splice(i, 1, '老婆', '兄弟'); i--; continue; }
+              else if (['大姨子', '小姨子', '姨子'].includes(step)) { steps.splice(i, 1, '老婆', '姊妹'); i--; continue; }
+              else if (['大伯', '小叔', '大伯子', '小叔子'].includes(step)) { steps.splice(i, 1, '老公', '兄弟'); i--; continue; }
+              else if (['大姑', '小姑', '大姑子', '小姑子'].includes(step)) { steps.splice(i, 1, '老公', '姊妹'); i--; continue; }
+              else if (['連襟', '襟兄', '襟弟'].includes(step)) { steps.splice(i, 1, '老婆', '姊妹', '老公'); i--; continue; }
+              else if (['妯娌'].includes(step)) { steps.splice(i, 1, '老公', '兄弟', '老婆'); i--; continue; }
               else if (['叔叔', '伯伯', '叔', '伯'].includes(step)) { steps.splice(i, 1, '爸爸', '兄弟'); i--; continue; }
               else if (['嬸嬸', '伯母'].includes(step)) { steps.splice(i, 1, '爸爸', '兄弟', '老婆'); i--; continue; }
               else if (['姑姑', '姑', '姑媽'].includes(step)) { steps.splice(i, 1, '爸爸', '姊妹'); i--; continue; }
