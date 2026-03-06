@@ -652,7 +652,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[#F5F5F0] overflow-hidden font-sans text-gray-800 relative" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
+    <div className="flex fixed inset-0 bg-[#F5F5F0] overflow-hidden font-sans text-gray-800">
       <div className="relative flex-1 h-full">
         <CanvasTree 
           members={members}
