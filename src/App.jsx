@@ -4,7 +4,7 @@ import {
   ZoomIn, ZoomOut, Maximize, UserCircle, ChevronRight, 
   ChevronDown, MessageSquare, MapPin, Heart, Edit3, Type, List,
   Download, Upload, Settings,
-  RefreshCcw, Edit2
+  RefreshCcw, Edit2, Link2
 } from 'lucide-react';
 
 // ==========================================
@@ -510,6 +510,25 @@ export default function App() {
     setMembers(normalizeMembers(draft));
   };
 
+  const handleUnlink = (fromId, toId, relType) => {
+    // relType: 'parent' | 'child' | 'spouse'
+    const draft = JSON.parse(JSON.stringify(members));
+    const from = draft[fromId];
+    const to = draft[toId];
+    if (!from || !to) return;
+    if (relType === 'parent') {
+      from.parents = from.parents.filter(id => id !== toId);
+      to.children = to.children.filter(id => id !== fromId);
+    } else if (relType === 'child') {
+      from.children = from.children.filter(id => id !== toId);
+      to.parents = to.parents.filter(id => id !== fromId);
+    } else if (relType === 'spouse') {
+      from.spouses = from.spouses.filter(id => id !== toId);
+      to.spouses = to.spouses.filter(id => id !== fromId);
+    }
+    setMembers(normalizeMembers(draft));
+  };
+
   const handleAddPost = (text) => {
     if (!selectedId) return;
     const newPost = { id: generateId(), date: new Date().toISOString().split('T')[0], text };
@@ -832,6 +851,8 @@ export default function App() {
             onAddPost={handleAddPost}
             onUpdateMember={handleUpdateMember}
             onDeleteMember={handleDeleteMember}
+            members={members}
+            onUnlink={handleUnlink}
           />
         )}
       </div>
@@ -2097,7 +2118,7 @@ const CanvasTree = ({ members, showInLaws = true, selectedId, onSelect, meId, fo
 // ==========================================
 // 5. 側邊欄 - 個人資料面板
 // ==========================================
-const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRelative, onAddByText, onShowQR, onAddPost, onUpdateMember, onDeleteMember }) => {
+const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRelative, onAddByText, onShowQR, onAddPost, onUpdateMember, onDeleteMember, members, onUnlink }) => {
   const [postText, setPostText] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(member.name);
@@ -2267,6 +2288,40 @@ const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRel
           <p className="text-gray-700 leading-relaxed text-sm">
             {member.bio || '尚未留下個人簡介。'}
           </p>
+        </div>
+
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <h3 className="text-sm font-bold text-gray-500 mb-2 flex items-center gap-2"><Link2 size={16}/> 關聯關係</h3>
+          {(() => {
+            const links = [];
+            member.parents.forEach(id => { if (members[id]) links.push({ id, name: members[id].name, label: '父母', type: 'parent' }); });
+            member.spouses.forEach(id => { if (members[id]) links.push({ id, name: members[id].name, label: '配偶', type: 'spouse' }); });
+            member.children.forEach(id => { if (members[id]) links.push({ id, name: members[id].name, label: '子女', type: 'child' }); });
+            if (links.length === 0) return <p className="text-gray-400 text-sm">尚無關聯。</p>;
+            return (
+              <div className="space-y-1">
+                {links.map(l => (
+                  <div key={l.id + l.type} className="flex items-center justify-between bg-stone-50 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                        l.type === 'parent' ? 'bg-blue-100 text-blue-600' :
+                        l.type === 'spouse' ? 'bg-pink-100 text-pink-600' :
+                        'bg-green-100 text-green-600'
+                      }`}>{l.label}</span>
+                      <span className="text-gray-700">{l.name}</span>
+                    </div>
+                    <button
+                      onClick={() => { if (confirm(`確定要移除與「${l.name}」的${l.label}關聯？`)) onUnlink(member.id, l.id, l.type); }}
+                      className="text-gray-300 hover:text-red-500 transition p-1"
+                      title="移除關聯"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 flex flex-col min-h-[300px]">
@@ -2443,9 +2498,13 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
       } else if (relType === 'sibling') {
         if (n1.parents.length === 0) {
           let dummyF = generateId();
-          draft[dummyF] = { id: dummyF, name: '未知(父親)', gender: 'M', birthday: '', deathDate: '', parents: [], children: [id1, id2], spouses: [], bio: '', posts: [], claimed: false };
+          let dummyM = generateId();
+          draft[dummyF] = { id: dummyF, name: '未知(父親)', gender: 'M', birthday: '', deathDate: '', parents: [], children: [id1, id2], spouses: [dummyM], bio: '', posts: [], claimed: false };
+          draft[dummyM] = { id: dummyM, name: '未知(母親)', gender: 'F', birthday: '', deathDate: '', parents: [], children: [id1, id2], spouses: [dummyF], bio: '', posts: [], claimed: false };
           addUnique(n1.parents, dummyF);
+          addUnique(n1.parents, dummyM);
           addUnique(n2.parents, dummyF);
+          addUnique(n2.parents, dummyM);
         } else {
           n1.parents.forEach(pid => {
             if (draft[pid]) {
@@ -2532,6 +2591,10 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
               else if (['伯公', '伯祖父'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸', '兄弟'); i--; continue; }
               else if (['嬸婆'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸', '兄弟', '老婆'); i--; continue; }
               else if (['姑婆'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸', '姊妹'); i--; continue; }
+              else if (['姨婆'].includes(step)) { steps.splice(i, 1, '媽媽', '媽媽', '姊妹'); i--; continue; }
+              else if (['姨丈公'].includes(step)) { steps.splice(i, 1, '媽媽', '媽媽', '姊妹', '老公'); i--; continue; }
+              else if (['舅公'].includes(step)) { steps.splice(i, 1, '媽媽', '媽媽', '兄弟'); i--; continue; }
+              else if (['舅婆'].includes(step)) { steps.splice(i, 1, '媽媽', '媽媽', '兄弟', '老婆'); i--; continue; }
               else if (['阿祖', '曾祖父'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸', '爸爸'); i--; continue; }
               else if (['曾祖母'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸', '媽媽'); i--; continue; }
               else if (['阿泰', '高祖父'].includes(step)) { steps.splice(i, 1, '爸爸', '爸爸', '爸爸', '爸爸'); i--; continue; }
