@@ -1379,21 +1379,30 @@ const CanvasTree = ({ members, selectedId, onSelect, meId, focusId, focusKey, se
             const isSpouse = a.data.spouses.includes(b.id);
             const isSibling = a.data.parents.some(pid => b.data.parents.includes(pid));
             const isParentChild = a.data.parents.includes(b.id) || b.data.parents.includes(a.id);
+            if (isSpouse) continue;
             const sameGenUnrelated = a.gen === b.gen && !isSpouse && !isSibling && !isParentChild;
-            const minDist = isSpouse ? 118 : (sameGenUnrelated ? 168 : 136);
+            const minDist = sameGenUnrelated ? 150 : 132;
 
             if (dist < minDist) {
               const overlap = minDist - dist;
               const nx = dx / dist;
               const ny = dy / dist;
-              a.x -= nx * overlap * 0.35;
-              a.y -= ny * overlap * 0.22;
-              b.x += nx * overlap * 0.35;
-              b.y += ny * overlap * 0.22;
+              a.x -= nx * overlap * 0.28;
+              a.y -= ny * overlap * 0.18;
+              b.x += nx * overlap * 0.28;
+              b.y += ny * overlap * 0.18;
             }
           }
         }
       }
+
+      // Pull nodes back toward layout targets after collision to prevent persistent tug-of-war.
+      visibleNodes.forEach(n => {
+        n.x += (n.targetX - n.x) * 0.18;
+        n.y += (n.targetY - n.y) * 0.18;
+        n.vx *= 0.9;
+        n.vy *= 0.9;
+      });
 
       const dpr = dprRef.current;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
