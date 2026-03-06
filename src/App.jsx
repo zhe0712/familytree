@@ -464,7 +464,7 @@ export default function App() {
     setMembers(prev => ({ ...prev, [id]: { ...prev[id], ...updates } }));
   };
 
-  const handleDeleteMember = (id) => {
+  const handleDeleteMember = (id, direction = 'down') => {
     if (!members[id]) return;
     if (Object.keys(members).length <= 1) {
       alert('至少需要保留一位成員。');
@@ -477,12 +477,15 @@ export default function App() {
       const currentId = queue.shift();
       const current = members[currentId];
       if (!current) continue;
-      current.children.forEach(cid => {
-        if (!toDelete.has(cid)) {
-          toDelete.add(cid);
-          queue.push(cid);
-        }
-      });
+      if (direction === 'down') {
+        current.children.forEach(cid => {
+          if (!toDelete.has(cid)) { toDelete.add(cid); queue.push(cid); }
+        });
+      } else {
+        current.parents.forEach(pid => {
+          if (!toDelete.has(pid)) { toDelete.add(pid); queue.push(pid); }
+        });
+      }
     }
 
     if (toDelete.size >= Object.keys(members).length) {
@@ -2143,15 +2146,26 @@ const ProfilePanel = ({ member, kinship, meId, onClose, onSetViewpoint, onAddRel
             <button onClick={() => onAddRelative('child')} className="py-2 border border-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm font-medium">子女</button>
             <button onClick={() => onAddRelative('sibling')} className="py-2 border border-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm font-medium">兄弟姊妹</button>
           </div>
-          <button
-            onClick={() => {
-              const ok = window.confirm(`確定要刪除「${member.name}」及其所有後代嗎？此操作無法復原。`);
-              if (ok) onDeleteMember(member.id);
-            }}
-            className="w-full mt-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm font-semibold"
-          >
-            刪除此人物與後代
-          </button>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => {
+                const ok = window.confirm(`確定要刪除「${member.name}」及其所有後代嗎？此操作無法復原。`);
+                if (ok) onDeleteMember(member.id, 'down');
+              }}
+              className="flex-1 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-xs font-semibold"
+            >
+              刪除此人與後代 ↓
+            </button>
+            <button
+              onClick={() => {
+                const ok = window.confirm(`確定要刪除「${member.name}」及其所有祖先嗎？此操作無法復原。`);
+                if (ok) onDeleteMember(member.id, 'up');
+              }}
+              className="flex-1 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-xs font-semibold"
+            >
+              刪除此人與祖先 ↑
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
