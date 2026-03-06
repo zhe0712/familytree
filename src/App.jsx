@@ -190,13 +190,13 @@ export default function App() {
     setSearchFocusKey(prev => prev + 1);
     setSearchHighlightId(id);
     setSearchQuery(members[id].name);
-      const handleCanvasSelect = (id) => {
-        setSuppressProfilePanel(false);
-        setSelectedId(id);
-      };
-
     setIsSearchOpen(false);
     setIsMobileSearchOpen(false);
+  };
+
+  const handleCanvasSelect = (id) => {
+    setSuppressProfilePanel(false);
+    setSelectedId(id);
   };
 
   // 匯出 JSON (包含族譜名稱與成員資料)
