@@ -2456,8 +2456,8 @@ const QAModal = ({ context, members, onClose, onSubmit }) => {
               else if (['小孩', '孩子'].includes(step)) { relType = 'child'; gender = textData.gender; }
               else if (['老公', '丈夫', '夫', '配偶'].includes(step)) { relType = 'spouse'; gender = 'M'; }
               else if (['老婆', '妻子', '妻'].includes(step)) { relType = 'spouse'; gender = 'F'; }
-              else if (['哥哥', '弟弟', '兄', '弟'].includes(step)) { relType = 'sibling'; gender = 'M'; }
-              else if (['姊姊', '妹妹', '姊', '姐', '妹'].includes(step)) { relType = 'sibling'; gender = 'F'; }
+              else if (['哥哥', '弟弟', '兄', '弟', '兄弟'].includes(step)) { relType = 'sibling'; gender = 'M'; }
+              else if (['姊姊', '妹妹', '姊', '姐', '妹', '姊妹', '姐妹'].includes(step)) { relType = 'sibling'; gender = 'F'; }
               // 複合親屬：自動展開為多步驟
               else if (['大嫂', '嫂嫂', '嫂'].includes(step)) { steps.splice(i, 1, '哥哥', '老婆'); i--; continue; }
               else if (['弟媳', '弟妹'].includes(step)) { steps.splice(i, 1, '弟弟', '老婆'); i--; continue; }
